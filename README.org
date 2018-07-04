@@ -1,9 +1,9 @@
-#+TITLE: BACKUP & RESTORE SHELL SCRIPTS
 #+AUTHOR: Toby Slight
+
+* BACKUP & RESTORE SCRIPTS
 
 Backup or restore all user profiles on a host.
 
-* MAC BACKUPS
 ** USAGE
 
 =backup [-br] [uxv] [-hH] [SHARE] [MOUNTPOINT]=
@@ -118,21 +118,3 @@ To restore from /Users to a rsync server, with increased verbosity:
 *.command files are used to make the script executable from the Finder.
 
 Script located [[file:macbash/bin/rwrap][here]].
-
-* WINDOWS BACKUPS
-
-*Robocopy wrapper*
-
-Takes a source and destination as an argument.
-
-Progress bar wrapper provides rather nice user feedback when the profiles are
-large.
-
-Provided verbose stream for viewing skipped files.
-
-Batch scripts are used to get around Group Policy limitations in present
-environment..
-
-Script located [[file:powershell/ps/Backup.ps1][here]].
-
-*TODO:* Implement hardlinking for incremental backups
