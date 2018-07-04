@@ -115,6 +115,7 @@ To restore from /Users to a rsync server, with increased verbosity:
 
 ** EXTRA
 
-*.command files are used to make the script executable from the Finder.
+A [[file:run.command][run.command]] wrapper script is used to make the script executable from the Finder.
 
-Script located [[file:macbash/bin/rwrap][here]].
+Original Bash script located [[file:macbash/bin/rwrap][here]].
+W.I.P Python re-write located [[file:macbash/bin/rwrap.py][here]].
