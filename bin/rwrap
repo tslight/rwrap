@@ -57,6 +57,7 @@ SMBOPTS=(
 
 DEFAULT_EXCLUDES=(
     --exclude="desktop.ini"
+    --exclude="AppData/"
     --exclude="*.ost"
     --exclude="*.pst"
     --exclude="*spotify*"
