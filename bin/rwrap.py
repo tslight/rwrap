@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 
-###############################################################################
-#                               IMPORT LIBRARIES                              #
-###############################################################################
-
 import argparse
-import fnmatch
 import os
 import pwd
 import re
-import readline
+import ui
+import size
 import subprocess
 import time
 
-###############################################################################
-#                              DECLARE CONSTANTS                              #
-###############################################################################
+from ui import ask
+from ui import choose
+from size import convert
+from size import totalsize
+
 
 RSYNC_OPTS = [
     '--archive',
@@ -30,160 +28,14 @@ DEFAULT_EXCLUDES = [
     '--exclude="*Spotify*"'
 ]
 
-###############################################################################
-#                          USEFUL PORTABLE FUNCTIONS                          #
-###############################################################################
 
 # check if a directory exists and if not try to create it.
-
-
 def check_dir(path):
-    if (not(os.isdir(path))):
+    if (not(os.path.isdir(path))):
         try:
             os.makedirs(path)
         except OSError:
             print("Could not create directory.")
-
-
-# infinite loop to get yes or no answer or quit the script
-def ask(question):
-    while True:
-        ans = input(question)
-        ans = ans.lower()
-        if re.match('^y(es)?$', ans):
-            return True
-        elif re.match('^n(o)?$', ans):
-            return False
-        elif re.match('^q(uit)?$', ans):
-            quit()
-        else:
-            print("%s is invalid. Enter (y)es, (n)o or (q)uit." % ans)
-
-
-# takes a list of options and selections as an argument and presents a checkbox
-# menu with previously selected items still selected.
-def show_menu(options, choices):
-    pad = 0
-    if os.name == 'nt':
-        os.system('cls')
-    else:
-        os.system('clear')
-        print("\nEnter the option's name (wildcards accepted), or number, to toggle\
-    a selection.\nEnter a to toggle all, r to reset or q to quit.\n")
-    for option in options:
-        if len(option[0]) > pad:
-            pad = len(option[0])
-    for option in options:
-        index = options.index(option)
-        print("{0:>1} {1:>2}) {2:{pad}} {3:>10}"
-              .format(choices[index], index+1,  option[0], option[1], pad=pad))
-
-
-# takes a list of options as an argument and returns a list of selected options
-# from that list.
-def get_selections(options):
-    choices = [""] * len(options)
-    selected = []
-    selectall, invalid = (False,)*2
-    fmt, msg = ("",)*2
-
-    while True:
-        show_menu(options, choices)
-        if fmt and msg:
-            print(fmt.format(msg))
-            choice = input("\n----> ")
-
-        if re.match('^a(ll)?$', choice):
-            invalid = False
-            if selectall:
-                for o in options:
-                    choices[options.index(o)] = ""
-                    selectall = False
-            else:
-                for o in options:
-                    choices[options.index(o)] = "+"
-                    selectall = True
-        elif re.match('r(eset)?$', choice):
-            invalid = False
-            for o in options:
-                choices[options.index(o)] = ""
-        elif re.match('q(uit)?$', choice):
-            invalid = False
-            print()
-            break
-        else:
-            count = 0
-            total = len(options)
-            for o in options:
-                i = options.index(o)
-                n = i+1
-                number = str(n)
-                regex = fnmatch.translate(choice)
-                if re.match(regex, o[0]) or re.match(regex, number):
-                    invalid = False
-                    if choices[i]:
-                        choices[i] = ""
-                    else:
-                        choices[i] = "+"
-                else:
-                    count += 1
-
-            if count == total:
-                invalid = True
-
-            for o in options:
-                if choices[options.index(o)]:
-                    selectall = True
-                else:
-                    selectall = False
-                    break
-
-        if invalid:
-            fmt = "\n{0:>5} not found. Maybe try {0}* or *{0}..."
-            msg = choice
-        else:
-            fmt, msg = ("",)*2
-
-    for o in options:
-        if choices[options.index(o)]:
-            selected.append(o)
-
-    return selected
-
-
-# takes a number of bytes as an argument and returns the most suitable human
-# readable unit conversion.
-def convert(size):
-    if size > 1024**3:
-        hr = round(size/1024**3)
-        unit = "GB"
-    elif size > 1024**2:
-        hr = round(size/1024**2)
-        unit = "MB"
-    else:
-        hr = round(size/1024)
-        unit = "KB"
-
-    hr = str(hr)
-    result = hr + " " + unit
-    return result
-
-
-# takes a path as an argument and returns the total size in bytes of the file or
-# directory. If the path is a directory the size will be calculated recursively.
-def get_size(path):
-    total = 0
-
-    if os.path.isdir(path):
-        for entry in os.scandir(path):
-            if entry.is_dir(follow_symlinks=False):
-                total += get_size(entry.path)
-            else:
-                total += entry.stat(follow_symlinks=False).st_size
-    else:
-        total += os.path.getsize(path)
-
-    return total
 
 
 # takes a path as an argument and returns a list of child paths that the user
@@ -192,23 +44,23 @@ def get_excludes(path):
     options = []
     paths = []
 
-    ls = sorted(listdir(path))
+    ls = sorted(os.listdir(path))
     for i in ls:
         # ignore dotfiles
         if i.startswith("."):
             continue
         lsp = path + "/" + i
-        size = get_size(lsp)
+        size = totalsize(lsp)
         size = convert(size)
         size = " ["+size+"]"
         options.append(tuple((i, size)))
 
-    excludes = get_selections(options)
+    excludes = choose(options)
 
     for e in excludes:
         p = path + "/" + e[0]
         paths.append(p)
-        if os.isdir(p):
+        if os.path.isdir(p):
             question = "Exclude all of "+p+"? "
             if not(ask(question)):
                 paths += get_excludes(p)
@@ -284,7 +136,7 @@ def rwrap(src, dest, automate_excludes):
             " ".join(DEFAULT_EXCLUDES) + " " + src + " " + dest
         subprocess.call(cmd, shell=True)
     else:
-        excludes = get_selections(src)
+        excludes = get_excludes(src)
         # list + set removes duplicates.
         excludes = excludes + list(set(excludes + DEFAULT_EXCLUDES))
         cmd = "rsync " + " ".join(RSYNC_OPTS) + \
