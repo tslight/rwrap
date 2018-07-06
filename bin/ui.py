@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import fnmatch
 import os
 import re
@@ -29,8 +28,10 @@ def menu(options, choices):
     else:
         os.system('clear')
 
-    print("\nEnter the option's name (wildcards accepted), or number, to toggle\
-    a selection.\nEnter a to toggle all, r to reset or q to quit.\n")
+    print("\nEnter option names (wildcards accepted), or numbers, to toggle "+
+          "selections.\n"+
+          "Enter t to toggle all, r to reset, a to accept selections, or q to"+
+          " quit.\n")
     
     for option in options:
         if len(option[0]) > pad:
@@ -57,10 +58,10 @@ def choose(options):
         if fmt and msg:
             print(fmt.format(msg))
 
-        # get array of input split on spaces
+        # get list of inputs split on spaces
         choice = input("\n----> ").split(" ")
 
-        if re.match('^a(ll)?$', choice[0]):
+        if re.match('^t(oggle)?$', choice[0]):
             invalid = False
             if selectall:
                 for o in options:
@@ -74,18 +75,23 @@ def choose(options):
             invalid = False
             for o in options:
                 choices[options.index(o)] = ""
-        elif re.match('q(uit)?$', choice[0]):
+        elif re.match('a(ccept)?$', choice[0]):
             invalid = False
             print()
             break
+        elif re.match('q(uit)?$', choice[0]):
+            invalid = False
+            print()
+            quit()
         else:
-            count = 0
-            total = len(options)
-            for o in options:
-                i = options.index(o)
-                n = i+1
-                number = str(n)
-                for c in choice:
+            # loop over list of inputs and use regex to compare to options
+            for c in choice:
+                count = 0
+                total = len(options)
+                for o in options:
+                    i = options.index(o)
+                    n = i+1 # number is index + 1
+                    number = str(n)
                     regex = fnmatch.translate(c)
                     if re.match(regex, o[0]) or re.match(regex, number):
                         invalid = False
@@ -94,10 +100,11 @@ def choose(options):
                         else:
                             choices[i] = "+"
                     else:
+                        invalid_choice = c
                         count += 1
 
-            if count == total:
-                invalid = True
+                if count == total:
+                    invalid = True
 
             for o in options:
                 if choices[options.index(o)]:
@@ -108,7 +115,7 @@ def choose(options):
 
         if invalid:
             fmt = "\n{0:>5} not found. Maybe try {0}* or *{0}..."
-            msg = choice
+            msg = invalid_choice
         else:
             fmt, msg = ("",)*2
 
