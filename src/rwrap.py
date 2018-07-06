@@ -54,7 +54,7 @@ def get_excludes(path):
     excludes = choose(options)
 
     for e in excludes:
-        p = path + "/" + e[0]
+        p = path + e[0]
         paths.append(p)
         if os.path.isdir(p):
             question = "Exclude all of "+p+"? "

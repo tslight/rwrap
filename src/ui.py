@@ -6,10 +6,10 @@ import re
 import readline
 
 
-''' Infinite loop to get yes or no answer or quit the script '''
-
-
 def ask(question):
+    ''' 
+    Infinite loop to get yes or no answer or quit the script
+    '''
     while True:
         ans = input(question)
         ans = ans.lower()
@@ -23,11 +23,14 @@ def ask(question):
             print("%s is invalid. Enter (y)es, (n)o or (q)uit." % ans)
 
 
-''' Takes a list of options and selections as an argument and presents a
-checkbox menu with previously selected items still selected.  '''
 
 
 def menu(options, chosen):
+    '''
+    Takes a list of options and selections as an argument and presents a
+    checkbox menu with previously selected items still selected.
+
+    '''
     pad = 0
     if os.name == 'nt':
         os.system('cls')
@@ -39,6 +42,7 @@ def menu(options, chosen):
           "Enter t to toggle all, r to reset, a to accept selections, or q to" +
           " quit.\n")
 
+    # find length of longest option and set the padding space to that
     for option in options:
         if len(option[0]) > pad:
             pad = len(option[0])
@@ -49,25 +53,27 @@ def menu(options, chosen):
               .format(chosen[index], index+1,  option[0], option[1], pad=pad))
 
 
-'''Takes two lists and compares them, for each item in the first list we see
-how many items in the second list it matches with globbing or with explicit
-number selection (based on the human readable, not 0 indexing!).
-
-Returns a tuple:
-
-The first element of which is a list of indexes of the second list that the
-first list matches.
-
-The second of which is a boolean that indicates whether or not any items in the
-first list failed to match with any items in the second.
-
-The Third element of which is the item of the first list that didn't match
-against any items in the second list.'''
-
-
 def get_matches(list1, list2):
+    '''
+    Takes two lists and compares them, for each item in the first list we see
+    how many items in the second list it matches with globbing or with explicit
+    number selection (based on the human readable, not 0 indexing!).
+
+    Returns a tuple:
+
+    The first element of which is a list of indexes of the second list that the
+    first list matches.
+
+    The second of which is a boolean that indicates whether or not any items in
+    the first list failed to match with any items in the second.
+
+    The Third element of which is the item of the first list that didn't match
+    against any items in the second list.
+
+    '''
     boolean = False
     matches = []
+    invalid = ""
 
     for items1 in list1:
         count = 0
@@ -90,41 +96,39 @@ def get_matches(list1, list2):
     return (matches, boolean, invalid)
 
 
-''' takes a list of options as an argument and returns a list of selected
-options from that list.'''
-
-
 def choose(options):
-    # initialize chosen to be same length as options but with empty items
-    chosen = [""] * len(options)
-    selected = []
-    selectall = False
-    fmt, msg = ("",)*2
+    ''' takes a list of options as an argument and returns a list of selected
+    options from that list.'''
+    # initialize marked to be same length as options but with empty items
+    marked = [""] * len(options)
+    chosen = []
+    markall = False
+    output = ""
 
     while True:
 
-        menu(options, chosen)
+        menu(options, marked)
 
-        if fmt and msg:
-            print(fmt.format(msg))
+        if output:
+            print(output)
 
         # get list of inputs split on spaces
         inputs = input("\n----> ").split(" ")
 
         if re.match('^t(oggle)?$', inputs[0]):
             invalid = False
-            if selectall:
+            if markall:
                 for o in options:
-                    chosen[options.index(o)] = ""
-                    selectall = False
+                    marked[options.index(o)] = ""
+                    markall = False
             else:
                 for o in options:
-                    chosen[options.index(o)] = "+"
-                    selectall = True
+                    marked[options.index(o)] = "+"
+                    markall = True
         elif re.match('r(eset)?$', inputs[0]):
             invalid = False
             for o in options:
-                chosen[options.index(o)] = ""
+                marked[options.index(o)] = ""
         elif re.match('a(ccept)?$', inputs[0]):
             invalid = False
             print()
@@ -140,17 +144,17 @@ def choose(options):
             invalid_input = matches[2]
 
             for m in matched:
-                if chosen[m]:
-                    chosen[m] = ""
+                if marked[m]:
+                    marked[m] = ""
                 else:
-                    chosen[m] = "+"
+                    marked[m] = "+"
 
-            # check if all options are selected or not
+            # check if all options are chosen or not
             for o in options:
-                if chosen[options.index(o)]:
-                    selectall = True
+                if marked[options.index(o)]:
+                    markall = True
                 else:
-                    selectall = False
+                    markall = False
                     break
 
         if invalid:
@@ -159,11 +163,13 @@ def choose(options):
         else:
             fmt, msg = ("",)*2
 
-    for o in options:
-        if chosen[options.index(o)]:
-            selected.append(o)
+        output = fmt.format(msg)
 
-    return selected
+    for o in options:
+        if marked[options.index(o)]:
+            chosen.append(o)
+
+    return chosen
 
 
 def main():
