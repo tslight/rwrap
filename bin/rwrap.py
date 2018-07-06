@@ -12,7 +12,6 @@ from ui import choose
 from size import convert
 from size import totalsize
 
-
 RSYNC_OPTS = [
     '--archive',
     '--human-readable'
@@ -25,7 +24,6 @@ DEFAULT_EXCLUDES = [
     '--exclude="*spotify*"',
     '--exclude="*Spotify*"'
 ]
-
 
 # check if a directory exists and if not try to create it.
 def check_dir(path):
