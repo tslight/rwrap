@@ -25,8 +25,11 @@ DEFAULT_EXCLUDES = [
     '--exclude="*Spotify*"'
 ]
 
-# check if a directory exists and if not try to create it.
+
 def check_dir(path):
+    """
+    Check if a directory exists and if not try to create it.
+    """
     if (not(os.path.isdir(path))):
         try:
             os.makedirs(path)
@@ -34,9 +37,11 @@ def check_dir(path):
             print("Could not create directory.")
 
 
-# takes a path as an argument and returns a list of child paths that the user
-# has selected.
 def get_excludes(path):
+    """
+    Takes a path as an argument and returns a list of child paths that the user
+    has selected.
+    """
     options = []
     paths = []
 

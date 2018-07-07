@@ -29,11 +29,12 @@ traversing.
 
 """
 
-import curses.wrapper
+import curses
 import random
 import os
 import sys
 import readline
+
 global root
 root = '.'
 ESC = 27
@@ -89,7 +90,7 @@ class Dir(File):
         if self.kidnames is None:
             return []
         if self.kids is None:
-            self.kids = [build_node(os.path.join(self.name, kid))
+            self.kids = [mknode(os.path.join(self.name, kid))
                          for kid in self.kidnames]
         return self.kids
 
@@ -150,38 +151,36 @@ def parse_keys(ch, curidx):
     return (action, curidx)
 
 
-def build_node(name):
+def mknode(name):
     if os.path.isdir(name):
         return Dir(name)
     else:
         return File(name)
 
 
-def main(stdscr):
-    results = []
-    objects = []
-    mydir = build_node(root)
-    mydir.expand()
+def select(stdscr, root):
+    selected = []
+    node = mknode(root)
+    node.expand()
     curidx = 1
     action = None
 
     while True:
         stdscr.erase()  # https://stackoverflow.com/a/24966639
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
         line = 0
         offset = max(0, curidx - curses.LINES + 10)
 
-        for data, depth in mydir.traverse():
+        for data, depth in node.traverse():
             if line == curidx:
                 stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
                 if action == 'toggle_mark':
                     if data.marked:
                         data.unmark()
-                        results.remove(data.name)
+                        selected.remove(data.name)
                     else:
                         data.mark()
-                        results.append(data.name)
+                        selected.append(data.name)
                     stdscr.attrset(curses.color_pair(0))
                     curidx += 1
                 elif action == 'toggle_expand':
@@ -190,10 +189,10 @@ def main(stdscr):
                     else:
                         data.expand()
                 elif action == 'reset':
-                    for d, dp in mydir.traverse():
+                    for d, dp in node.traverse():
                         if d.marked:
                             d.unmark()
-                            results.remove(d.name)
+                            selected.remove(d.name)
                 elif action:
                     getattr(data, action)()
                 action = None
@@ -207,7 +206,7 @@ def main(stdscr):
         stdscr.refresh()
         ch = stdscr.getch()
         if ch == ord('e') or ch == ord('q') or ch == ESC:
-            return results
+            return selected
         else:
             keyresult = parse_keys(ch, curidx)
             action = keyresult[0]
@@ -222,10 +221,12 @@ def open_tty():
     os.close(1)
     stdin = os.open('/dev/tty', os.O_RDONLY)
     stdout = os.open('/dev/tty', os.O_RDWR)
-    return saved_stdin, saved_stdout
+    return (saved_stdin, saved_stdout)
 
 
-def restore_stdio((saved_stdin, saved_stdout)):
+def restore_stdio(saved_fds):
+    saved_stdin = saved_fds[0]
+    saved_stdout = saved_fds[1]
     os.close(0)
     os.close(1)
     os.dup(saved_stdin)
@@ -237,8 +238,8 @@ if __name__ == '__main__':
         root = sys.argv[1]
     saved_fds = open_tty()
     try:
-        results = curses.wrapper(main)
+        paths = curses.wrapper(select)
     finally:
         restore_stdio(saved_fds)
 
-    print(results)
+    print(paths)
