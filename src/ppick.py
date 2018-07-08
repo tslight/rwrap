@@ -26,7 +26,6 @@ behind its back.
 So the strategy is to store our current linear position in the inorder
 traversal, and defer operations on the current node until the next time we're
 traversing.
-
 """
 
 import curses
@@ -34,11 +33,6 @@ import random
 import os
 import sys
 import readline
-
-global root
-root = '.'
-ESC = 27
-os.environ.setdefault('ESCDELAY', '25')  # otherwise it takes an age!
 
 
 def pad(data, width):
@@ -48,9 +42,17 @@ def pad(data, width):
 
 class File:
     def __init__(self, name):
-        self.name = name
+        self.hidden = True
+        if self.hidden:
+            if os.path.basename(name).startswith('.'):
+                self.name = ""
+            else:
+                self.name = name
+
         self.marked = False
         self.expanded = False
+        if not self.name:
+            return
 
     def render(self, depth, width):
         return pad('%s%s %s%s' % (' ' * 4 * depth, self.icon1(),
@@ -74,10 +76,21 @@ class File:
 
     def unmark(self): self.marked = False
 
+    def hide(self): self.hidden = True
+
+    def show(self): self.hidden = False
+
 
 class Dir(File):
     def __init__(self, name):
         File.__init__(self, name)
+        self.hidden = True
+        if self.hidden:
+            if os.path.basename(name).startswith('.'):
+                self.name = ""
+                return
+            else:
+                self.name = name
         try:
             self.kidnames = sorted(os.listdir(name))
         except:
@@ -118,7 +131,13 @@ class Dir(File):
 
     def unmark(self): self.marked = False
 
+    def hide(self): self.hidden = True
+
+    def show(self): self.hidden = False
+
     def traverse(self):
+        if not self.name:
+            return
         yield self, 0
         if not self.expanded:
             return
@@ -148,6 +167,8 @@ def parse_keys(ch, curidx):
         action = 'toggle_mark'
     elif ch == ord('r'):
         action = 'reset'
+    elif ch == ord('.'):
+        action = 'toggle_hidden'
     return (action, curidx)
 
 
@@ -164,6 +185,8 @@ def select(stdscr, root):
     node.expand()
     curidx = 1
     action = None
+    ESC = 27
+    os.environ.setdefault('ESCDELAY', '25')  # otherwise it takes an age!
 
     while True:
         stdscr.erase()  # https://stackoverflow.com/a/24966639
@@ -188,6 +211,11 @@ def select(stdscr, root):
                         data.collapse()
                     else:
                         data.expand()
+                elif action == 'toggle_hidden':
+                    if data.hidden:
+                        data.hide()
+                    else:
+                        data.show()
                 elif action == 'reset':
                     for d, dp in node.traverse():
                         if d.marked:
@@ -236,9 +264,11 @@ def restore_stdio(saved_fds):
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         root = sys.argv[1]
+    else:
+        root = "."
     saved_fds = open_tty()
     try:
-        paths = curses.wrapper(select)
+        paths = curses.wrapper(select, root)
     finally:
         restore_stdio(saved_fds)
 

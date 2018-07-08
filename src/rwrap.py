@@ -1,16 +1,13 @@
 import argparse
+import curses
 import os
 import pwd
 import re
-import ui
-import size
 import subprocess
 import time
 
 from ui import ask
-from ui import choose
-from size import convert
-from size import totalsize
+from ppick import select
 
 RSYNC_OPTS = [
     '--archive',
@@ -42,54 +39,24 @@ def get_excludes(path):
     Takes a path as an argument and returns a list of child paths that the user
     has selected.
     """
-    options = []
-    paths = []
-
-    ls = sorted(os.listdir(path))
-    for i in ls:
-        # ignore dotfiles
-        if i.startswith("."):
-            continue
-        lsp = path + "/" + i
-        size = totalsize(lsp)
-        size = convert(size)
-        size = " ["+size+"]"
-        options.append(tuple((i, size)))
-
-    excludes = choose(options)
-
-    for e in excludes:
-        p = path + e[0]
-        paths.append(p)
-        if os.path.isdir(p):
-            question = "Exclude all of "+p+"? "
-            if not(ask(question)):
-                paths += get_excludes(p)
-
-    return paths
-
-
-# takes a list of excluded directories & parent path as an argument and checks
-# if the user is happy with the selections. Returns unchanged list if so, or
-# re-gets excludes if not.
-def check_excludes(excludes, path):
+    excludes = curses.wrapper(select, path)
     if len(excludes) > 0:
-        print("\nSelected excludes:\n")
-        for e in excludes:
-            print("\t{}".format(e))
-            if ask("\nAccept and use excludes? "):
-                return excludes
-            else:
-                excludes = get_excludes(path)
-                check_excludes(excludes, path)
+        print("\nSelected excludes:\n"+('\n'.join(excludes)))
+        if ask("\nAccept and use excludes? "):
+            return excludes
+        else:
+            excludes = get_excludes(path)
     else:
         if not(ask("\nNo excludes selected. Continue? ")):
             excludes = get_excludes(path)
-            check_excludes(excludes, path)
+    return excludes
 
 
-# returns a list of local users on the current machine.
 def get_users():
+    """
+    Return a dictionary of users. User name is the key, home directory path is
+    the value.
+    """
     users = {}
     for p in pwd.getpwall():
         user = p[0]
@@ -101,8 +68,10 @@ def get_users():
     return users
 
 
-# return a list of valid arguments
 def get_args():
+    """
+    Return a list of valid arguments.
+    """
     parser = argparse.ArgumentParser(description='\
     Backup or restore users to an rsync server.')
     group = parser.add_mutually_exclusive_group(required=True)
