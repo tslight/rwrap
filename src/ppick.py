@@ -1,14 +1,5 @@
 #!/usr/bin/python
 """
-Yet another curses-based directory tree browser, in Python.
-
-I thought I could use something like this for filename entry, kind of like the
-old 4DOS 'select' command --- cd $(cursoutline.py).  So you navigate and hit
-Enter, and it exits and spits out the file you're on.
-
-Originally from: http://lists.canonical.org/pipermail/kragen-hacks/2005-December/000424.html
-Originally by: Kragen Sitaker
-
 There are several general approaches to the drawing-an-outline problem. This
 program supports the following operations:
 
@@ -213,25 +204,6 @@ def select(stdscr, root, hidden):
         curline %= line
 
 
-def open_tty():
-    saved_stdin = os.dup(0)
-    saved_stdout = os.dup(1)
-    os.close(0)
-    os.close(1)
-    stdin = os.open('/dev/tty', os.O_RDONLY)
-    stdout = os.open('/dev/tty', os.O_RDWR)
-    return (saved_stdin, saved_stdout)
-
-
-def restore_stdio(saved_fds):
-    saved_stdin = saved_fds[0]
-    saved_stdout = saved_fds[1]
-    os.close(0)
-    os.close(1)
-    os.dup(saved_stdin)
-    os.dup(saved_stdout)
-
-
 def get_args():
     """
     Return a list of valid arguments.
@@ -249,10 +221,5 @@ if __name__ == '__main__':
     args = get_args()
     root = args.path
     hidden = args.hidden
-    saved_fds = open_tty()
-    try:
-        paths = curses.wrapper(select, root, hidden)
-    finally:
-        restore_stdio(saved_fds)
-
+    paths = curses.wrapper(select, root, hidden)
     print("\n".join(paths))
