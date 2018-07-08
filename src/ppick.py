@@ -47,36 +47,8 @@ def listdir_nohidden(path):
             yield f
 
 
-# class File:
-#     def __init__(self, name, hidden):
-#         self.name = name
-#         self.hidden = hidden
-#         self.marked = False
-#         self.expanded = False
-
-#     def icon1(self): return '   '
-
-#     def icon2(self):
-#         if self.marked:
-#             return ' * '
-#         else:
-#             return ''
-
-#     def traverse(self): yield self, 0
-
-#     def expand(self): pass
-
-#     def collapse(self): pass
-
-#     def mark(self): self.marked = True
-
-#     def unmark(self): self.marked = False
-
-
-class Dir:
+class Paths:
     def __init__(self, name, hidden):
-        # if not os.path.isdir(name):
-        #     File(name, hidden)
 
         self.name = name
         self.hidden = hidden
@@ -101,12 +73,14 @@ class Dir:
         if self.children is None:
             return
         if self.childpaths is None:
-            self.childpaths = [Dir(os.path.join(self.name, child), self.hidden)
+            self.childpaths = [Paths(os.path.join(self.name, child), self.hidden)
                                for child in self.children]
         return self.childpaths
 
     def icon1(self):
-        if self.expanded:
+        if not os.path.isdir(self.name):
+            return '   '
+        elif self.expanded:
             return '[-]'
         elif self.get_children():
             return '[+]'
@@ -121,9 +95,17 @@ class Dir:
         else:
             return ''
 
-    def expand(self): self.expanded = True
+    def expand(self):
+        if os.path.isdir(self.name):
+            self.expanded = True
+        else:
+            pass
 
-    def collapse(self): self.expanded = False
+    def collapse(self):
+        if os.path.isdir(self.name):
+            self.expanded = False
+        else:
+            pass
 
     def mark(self): self.marked = True
 
@@ -165,7 +147,7 @@ def parse_keys(ch, curline):
 
 
 def select(stdscr, root, hidden):
-    parent = Dir(root, hidden)
+    parent = Paths(root, hidden)
     parent.expand()
     curline = 1
     action = None
@@ -200,14 +182,14 @@ def select(stdscr, root, hidden):
                 elif action == 'toggle_hidden':
                     if hidden:
                         hidden = False
-                        parent = Dir(root, hidden)
+                        parent = Paths(root, hidden)
                         parent.expand()
                     else:
                         hidden = True
-                        parent = Dir(root, hidden)
+                        parent = Paths(root, hidden)
                         parent.expand()
                 elif action == 'reset':
-                    parent = Dir(root, hidden)
+                    parent = Paths(root, hidden)
                     parent.expand()
                     selected = []
                 elif action:
