@@ -8,6 +8,7 @@ import time
 
 from ui import ask
 from ppick import select
+os.environ.setdefault('ESCDELAY', '12')  # otherwise it takes an age!
 
 RSYNC_OPTS = [
     '--archive',

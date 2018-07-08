@@ -42,17 +42,9 @@ def pad(data, width):
 
 class File:
     def __init__(self, name):
-        self.hidden = True
-        if self.hidden:
-            if os.path.basename(name).startswith('.'):
-                self.name = ""
-            else:
-                self.name = name
-
+        self.name = name
         self.marked = False
         self.expanded = False
-        if not self.name:
-            return
 
     def render(self, depth, width):
         return pad('%s%s %s%s' % (' ' * 4 * depth, self.icon1(),
@@ -81,18 +73,21 @@ class File:
     def show(self): self.hidden = False
 
 
+def listdir_nohidden(path):
+    for f in os.listdir(path):
+        if not f.startswith('.'):
+            yield f
+
+
 class Dir(File):
     def __init__(self, name):
-        File.__init__(self, name)
         self.hidden = True
-        if self.hidden:
-            if os.path.basename(name).startswith('.'):
-                self.name = ""
-                return
-            else:
-                self.name = name
+        File.__init__(self, name)
         try:
-            self.kidnames = sorted(os.listdir(name))
+            if self.hidden:
+                self.kidnames = sorted(listdir_nohidden(name))
+            else:
+                self.kidnames = sorted(os.listdir(name))
         except:
             self.kidnames = None  # probably permission denied
         self.kids = None
@@ -136,8 +131,6 @@ class Dir(File):
     def show(self): self.hidden = False
 
     def traverse(self):
-        if not self.name:
-            return
         yield self, 0
         if not self.expanded:
             return
@@ -165,18 +158,18 @@ def parse_keys(ch, curidx):
         curidx = line - 1
     elif ch == ord('m') or ch == ord('\n') or ch == ord(' '):
         action = 'toggle_mark'
-    elif ch == ord('r'):
-        action = 'reset'
     elif ch == ord('.'):
         action = 'toggle_hidden'
+    elif ch == ord('r'):
+        action = 'reset'
     return (action, curidx)
 
 
-def mknode(name):
-    if os.path.isdir(name):
-        return Dir(name)
+def mknode(path):
+    if os.path.isdir(path):
+        return Dir(path)
     else:
-        return File(name)
+        return File(path)
 
 
 def select(stdscr, root):
@@ -186,7 +179,6 @@ def select(stdscr, root):
     curidx = 1
     action = None
     ESC = 27
-    os.environ.setdefault('ESCDELAY', '25')  # otherwise it takes an age!
 
     while True:
         stdscr.erase()  # https://stackoverflow.com/a/24966639
