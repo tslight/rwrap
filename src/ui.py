@@ -7,7 +7,7 @@ import readline
 
 
 def ask(question):
-    ''' 
+    '''
     Infinite loop to get yes or no answer or quit the script
     '''
     while True:
@@ -21,8 +21,6 @@ def ask(question):
             quit()
         else:
             print("%s is invalid. Enter (y)es, (n)o or (q)uit." % ans)
-
-
 
 
 def menu(options, chosen):

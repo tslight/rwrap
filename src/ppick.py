@@ -27,38 +27,34 @@ import sys
 import readline
 
 
-def pad(data, width):
-    # XXX this won't work with UTF-8
-    return data + ' ' * (width - len(data))
-
-
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
-
-
 class Paths:
     def __init__(self, name, hidden):
-
         self.name = name
         self.hidden = hidden
-
         try:
             if self.hidden:
-                self.children = sorted(listdir_nohidden(name))
+                self.children = sorted(self.listdir(name))
             else:
                 self.children = sorted(os.listdir(name))
         except:
             self.children = None  # probably permission denied
-
         self.childpaths = None
         self.expanded = False
         self.marked = False
 
+    def listdir(self, path):
+        for f in os.listdir(path):
+            if not f.startswith('.'):
+                yield f
+
     def render(self, depth, width):
-        return pad('%s%s %s%s' % (' ' * 4 * depth, self.icon1(),
-                                  os.path.basename(self.name), self.icon2()), width)
+        padstr = ' ' * 4 * depth
+        icon1 = self.icon1()
+        icon2 = self.icon2()
+        node = os.path.basename(self.name)
+        nodestr = padstr + icon1 + ' ' + node + icon2
+        nodefmt = '{}'.format(nodestr)
+        return nodefmt + ' ' * (width - len(nodefmt))
 
     def get_children(self):
         if self.children is None:
@@ -191,7 +187,7 @@ def select(stdscr, root, hidden):
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
                               child.render(depth, curses.COLS))
-            line += 1
+                line += 1
 
         stdscr.refresh()
         ch = stdscr.getch()
@@ -201,7 +197,7 @@ def select(stdscr, root, hidden):
             keyresult = parse_keys(ch, curline)
             action = keyresult[0]
             curline = keyresult[1]
-        curline %= line
+            curline %= line
 
 
 def get_args():
