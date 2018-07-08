@@ -28,6 +28,7 @@ traversal, and defer operations on the current node until the next time we're
 traversing.
 """
 
+import argparse
 import curses
 import random
 import os
@@ -40,9 +41,16 @@ def pad(data, width):
     return data + ' ' * (width - len(data))
 
 
+def listdir_nohidden(path):
+    for f in os.listdir(path):
+        if not f.startswith('.'):
+            yield f
+
+
 class File:
-    def __init__(self, name):
+    def __init__(self, name, hidden):
         self.name = name
+        self.hidden = hidden
         self.marked = False
         self.expanded = False
 
@@ -68,21 +76,11 @@ class File:
 
     def unmark(self): self.marked = False
 
-    def hide(self): self.hidden = True
-
-    def show(self): self.hidden = False
-
-
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
-
 
 class Dir(File):
-    def __init__(self, name):
-        self.hidden = True
-        File.__init__(self, name)
+    def __init__(self, name, hidden):
+        File.__init__(self, name, hidden)
+        self.hidden = hidden
         try:
             if self.hidden:
                 self.kidnames = sorted(listdir_nohidden(name))
@@ -98,7 +96,9 @@ class Dir(File):
         if self.kidnames is None:
             return []
         if self.kids is None:
-            self.kids = [mknode(os.path.join(self.name, kid))
+            # for kid in self.kidnames:
+            #     self.kids = mknode(os.path.join(self.name, kid), self.hidden)
+            self.kids = [mknode(os.path.join(self.name, kid), self.hidden)
                          for kid in self.kidnames]
         return self.kids
 
@@ -126,12 +126,8 @@ class Dir(File):
 
     def unmark(self): self.marked = False
 
-    def hide(self): self.hidden = True
-
-    def show(self): self.hidden = False
-
     def traverse(self):
-        yield self, 0
+        yield (self, 0)
         if not self.expanded:
             return
 
@@ -150,13 +146,13 @@ def parse_keys(ch, curidx):
         action = 'expand'
     elif ch == curses.KEY_LEFT or ch == ord('h') or ch == ord('b'):
         action = 'collapse'
-    elif ch == ord('\t'):
-        action = 'toggle_expand'
     elif ch == curses.KEY_HOME or ch == ord('g') or ch == ord('<'):
         curidx = 0
-    elif ch == curses.KEY_HOME or ch == ord('G') or ch == ord('>'):
+    elif ch == curses.KEY_END or ch == ord('G') or ch == ord('>'):
         curidx = line - 1
-    elif ch == ord('m') or ch == ord('\n') or ch == ord(' '):
+    elif ch == ord('\t') or ch == ord('\n'):
+        action = 'toggle_expand'
+    elif ch == ord('m') or ch == ord(' '):
         action = 'toggle_mark'
     elif ch == ord('.'):
         action = 'toggle_hidden'
@@ -165,20 +161,20 @@ def parse_keys(ch, curidx):
     return (action, curidx)
 
 
-def mknode(path):
+def mknode(path, hidden):
     if os.path.isdir(path):
-        return Dir(path)
+        return Dir(path, hidden)
     else:
-        return File(path)
+        return File(path, hidden)
 
 
-def select(stdscr, root):
-    selected = []
-    node = mknode(root)
+def select(stdscr, root, hidden):
+    node = mknode(root, hidden)
     node.expand()
     curidx = 1
     action = None
     ESC = 27
+    selected = []
 
     while True:
         stdscr.erase()  # https://stackoverflow.com/a/24966639
@@ -204,15 +200,19 @@ def select(stdscr, root):
                     else:
                         data.expand()
                 elif action == 'toggle_hidden':
-                    if data.hidden:
-                        data.hide()
+                    # such a terrible hack!
+                    if hidden:
+                        hidden = False
+                        selected = select(stdscr, root, hidden)
+                        return selected
                     else:
-                        data.show()
+                        hidden = True
+                        selected = select(stdscr, root, hidden)
+                        return selected
                 elif action == 'reset':
-                    for d, dp in node.traverse():
-                        if d.marked:
-                            d.unmark()
-                            selected.remove(d.name)
+                    # such a terrible hack!
+                    selected = select(stdscr, root)
+                    return selected
                 elif action:
                     getattr(data, action)()
                 action = None
@@ -253,14 +253,25 @@ def restore_stdio(saved_fds):
     os.dup(saved_stdout)
 
 
+def get_args():
+    """
+    Return a list of valid arguments.
+    """
+    parser = argparse.ArgumentParser(description='\
+    Select paths from a directory tree.')
+    parser.add_argument("-a", "--hidden", action="store_true",
+                        help="Show all hidden paths too.")
+    parser.add_argument("path", type=str, default='.', help="A valid path.")
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        root = sys.argv[1]
-    else:
-        root = "."
+    args = get_args()
+    root = args.path
+    hidden = args.hidden
     saved_fds = open_tty()
     try:
-        paths = curses.wrapper(select, root)
+        paths = curses.wrapper(select, root, hidden)
     finally:
         restore_stdio(saved_fds)
 
