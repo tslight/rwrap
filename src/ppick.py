@@ -176,12 +176,13 @@ def select(stdscr, root, hidden):
         offset = max(0, curline - curses.LINES + 10)
         line = 0
 
+        oldline = curline
         # to reset or toggle view of dotfiles we need to create a new Path
         # object before, erasing the screen & descending into draw loop.
         if action == 'reset':
             parent = Paths(root, hidden)
             parent.expand()
-            curline = 0
+            curline = oldline  # restore old position
             action = None
             selected = []
         elif action == 'toggle_hidden':
