@@ -122,11 +122,15 @@ def parse_keys(stdscr, curline, line):
         action = 'expand'
     elif ch == curses.KEY_LEFT or ch == ord('h') or ch == ord('b'):
         action = 'collapse'
-    elif ch == curses.KEY_PPAGE or ch == ord('B') or ch == ord('V'):
+    elif ch == curses.KEY_RIGHT or ch == ord('L') or ch == ord('F'):
+        action = 'expand_all'
+    elif ch == curses.KEY_LEFT or ch == ord('H') or ch == ord('B'):
+        action = 'collapse_all'
+    elif ch == curses.KEY_PPAGE or ch == ord('u') or ch == ord('V'):
         curline -= curses.LINES
         if curline < 0:
             curline = 0
-    elif ch == curses.KEY_NPAGE or ch == ord('F') or ch == ord('v'):
+    elif ch == curses.KEY_NPAGE or ch == ord('d') or ch == ord('v'):
         curline += curses.LINES
         if curline >= line:
             curline = line - 1
@@ -136,6 +140,8 @@ def parse_keys(stdscr, curline, line):
         curline = line - 1
     elif ch == ord('\t') or ch == ord('\n'):
         action = 'toggle_expand'
+    elif ch == ord('t') or ch == ord('a'):
+        action = 'toggle_expand_all'
     elif ch == ord('m') or ch == ord(' '):
         action = 'toggle_mark'
     elif ch == ord('.'):
@@ -210,6 +216,10 @@ def select(stdscr, root, hidden):
                         child.collapse()
                     else:
                         child.expand()
+                elif action == 'expand':
+                    child.expand()
+                    stdscr.attrset(curses.color_pair(0))
+                    curline += 1
                 elif action:
                     getattr(child, action)()
                 action = None
