@@ -145,6 +145,11 @@ def select(stdscr, root, hidden):
     selected = []
 
     while True:
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+
+        # to reset or toggle view of dotfiles we need to create a new Path
+        # object before, erasing the screen & descending into draw loop.
         if action == 'reset':
             parent = Paths(root, hidden)
             parent.expand()
@@ -159,27 +164,30 @@ def select(stdscr, root, hidden):
             parent = Paths(root, hidden)
             parent.expand()
             action = None
+            # restore marked state
+            for child, depth in parent.traverse():
+                for s in selected:
+                    if child.name == s:
+                        child.mark()
 
-        stdscr.erase()  # https://stackoverflow.com/a/24966639
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         line = 0
         offset = max(0, curline - curses.LINES + 10)
+        stdscr.erase()  # https://stackoverflow.com/a/24966639
 
-        children = parent.traverse()
-
-        for child, depth in children:
-            if depth == 0:  # don't create root node
-                continue
+        for child, depth in parent.traverse():
+            if depth == 0:
+                continue  # don't draw root node
             if line == curline:
                 stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
                 if action == 'toggle_mark':
                     if child.marked:
                         child.unmark()
                         selected.remove(child.name)
+                        stdscr.attrset(curses.color_pair(0))
                     else:
                         child.mark()
                         selected.append(child.name)
-                    stdscr.attrset(curses.color_pair(0))
+                        stdscr.attrset(curses.color_pair(2))
                     curline += 1
                 elif action == 'toggle_expand':
                     if child.expanded:
@@ -191,6 +199,10 @@ def select(stdscr, root, hidden):
                 action = None
             else:
                 stdscr.attrset(curses.color_pair(0))
+                # restore color to marked
+                for s in selected:
+                    if child.name == s:
+                        stdscr.attrset(curses.color_pair(2))
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
