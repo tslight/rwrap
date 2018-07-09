@@ -122,6 +122,14 @@ def parse_keys(stdscr, curline, line):
         action = 'expand'
     elif ch == curses.KEY_LEFT or ch == ord('h') or ch == ord('b'):
         action = 'collapse'
+    elif ch == curses.KEY_PPAGE or ch == ord('B') or ch == ord('V'):
+        curline -= curses.LINES
+        if curline < 0:
+            curline = 0
+    elif ch == curses.KEY_NPAGE or ch == ord('F') or ch == ord('v'):
+        curline += curses.LINES
+        if curline >= line:
+            curline = line - 1
     elif ch == curses.KEY_HOME or ch == ord('g') or ch == ord('<'):
         curline = 0
     elif ch == curses.KEY_END or ch == ord('G') or ch == ord('>'):
@@ -134,6 +142,7 @@ def parse_keys(stdscr, curline, line):
         action = 'toggle_hidden'
     elif ch == ord('r'):
         action = 'reset'
+    curline %= line
     return action, curline
 
 
@@ -148,6 +157,8 @@ def select(stdscr, root, hidden):
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+        offset = max(0, curline - curses.LINES + 10)
+        line = 0
 
         # to reset or toggle view of dotfiles we need to create a new Path
         # object before, erasing the screen & descending into draw loop.
@@ -170,8 +181,6 @@ def select(stdscr, root, hidden):
                 if child.name in selected:
                     child.mark()
 
-        line = 0
-        offset = max(0, curline - curses.LINES + 10)
         stdscr.erase()  # https://stackoverflow.com/a/24966639
 
         for child, depth in parent.traverse():
@@ -213,16 +222,18 @@ def select(stdscr, root, hidden):
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
                               child.draw_line(depth - 1, curses.COLS))
-                line += 1
+
+            # make sure this doesn't get added to an if block or scrolling breaks!
+            line += 1
 
         stdscr.refresh()
+
         results = parse_keys(stdscr, curline, line)
         if results:
             action = results[0]
             curline = results[1]
         else:
             return selected
-        curline %= line
 
 
 def get_args():
