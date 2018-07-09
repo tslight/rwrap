@@ -108,9 +108,13 @@ class Paths:
                 yield c, depth + 1
 
 
-def parse_keys(ch, curline):
+def parse_keys(stdscr, curline):
+    ESC = 27
     action = None
-    if ch == curses.KEY_UP or ch == ord('k') or ch == ord('p'):
+    ch = stdscr.getch()
+    if ch == ord('e') or ch == ord('q') or ch == ESC:
+        return
+    elif ch == curses.KEY_UP or ch == ord('k') or ch == ord('p'):
         curline -= 1
     elif ch == curses.KEY_DOWN or ch == ord('j') or ch == ord('n'):
         curline += 1
@@ -130,7 +134,7 @@ def parse_keys(ch, curline):
         action = 'toggle_hidden'
     elif ch == ord('r'):
         action = 'reset'
-    return (action, curline)
+    return action, curline
 
 
 def select(stdscr, root, hidden):
@@ -138,7 +142,6 @@ def select(stdscr, root, hidden):
     parent.expand()
     curline = 1
     action = None
-    ESC = 27
     selected = []
 
     while True:
@@ -169,12 +172,10 @@ def select(stdscr, root, hidden):
                 elif action == 'toggle_hidden':
                     if hidden:
                         hidden = False
-                        parent = Paths(root, hidden)
-                        parent.expand()
                     else:
                         hidden = True
-                        parent = Paths(root, hidden)
-                        parent.expand()
+                    parent = Paths(root, hidden)
+                    parent.expand()
                 elif action == 'reset':
                     parent = Paths(root, hidden)
                     parent.expand()
@@ -184,20 +185,20 @@ def select(stdscr, root, hidden):
                 action = None
             else:
                 stdscr.attrset(curses.color_pair(0))
+
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
                               child.draw_line(depth, curses.COLS))
                 line += 1
 
         stdscr.refresh()
-        ch = stdscr.getch()
-        if ch == ord('e') or ch == ord('q') or ch == ESC:
-            return selected
+        results = parse_keys(stdscr, curline)
+        if results:
+            action = results[0]
+            curline = results[1]
         else:
-            keyresult = parse_keys(ch, curline)
-            action = keyresult[0]
-            curline = keyresult[1]
-            curline %= line
+            return selected
+        curline %= line
 
 
 def get_args():
