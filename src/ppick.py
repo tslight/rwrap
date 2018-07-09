@@ -145,6 +145,20 @@ def select(stdscr, root, hidden):
     selected = []
 
     while True:
+        if action == 'reset':
+            parent = Paths(root, hidden)
+            parent.expand()
+            selected = []
+            action = None
+        elif action == 'toggle_hidden':
+            if hidden:
+                hidden = False
+            else:
+                hidden = True
+            parent = Paths(root, hidden)
+            parent.expand()
+            action = None
+
         stdscr.erase()  # https://stackoverflow.com/a/24966639
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         line = 0
@@ -169,17 +183,6 @@ def select(stdscr, root, hidden):
                         child.collapse()
                     else:
                         child.expand()
-                elif action == 'toggle_hidden':
-                    if hidden:
-                        hidden = False
-                    else:
-                        hidden = True
-                    parent = Paths(root, hidden)
-                    parent.expand()
-                elif action == 'reset':
-                    parent = Paths(root, hidden)
-                    parent.expand()
-                    selected = []
                 elif action:
                     getattr(child, action)()
                 action = None
