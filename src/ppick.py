@@ -166,9 +166,8 @@ def select(stdscr, root, hidden):
             action = None
             # restore marked state
             for child, depth in parent.traverse():
-                for s in selected:
-                    if child.name == s:
-                        child.mark()
+                if child.name in selected:
+                    child.mark()
 
         line = 0
         offset = max(0, curline - curses.LINES + 10)
@@ -200,9 +199,8 @@ def select(stdscr, root, hidden):
             else:
                 stdscr.attrset(curses.color_pair(0))
                 # restore color to marked
-                for s in selected:
-                    if child.name == s:
-                        stdscr.attrset(curses.color_pair(2))
+                if child.name in selected:
+                    stdscr.attrset(curses.color_pair(2))
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
