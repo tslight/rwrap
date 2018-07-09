@@ -108,7 +108,7 @@ class Paths:
                 yield c, depth + 1
 
 
-def parse_keys(stdscr, curline):
+def parse_keys(stdscr, curline, line):
     ESC = 27
     action = None
     ch = stdscr.getch()
@@ -140,7 +140,7 @@ def parse_keys(stdscr, curline):
 def select(stdscr, root, hidden):
     parent = Paths(root, hidden)
     parent.expand()
-    curline = 1
+    curline = 0
     action = None
     selected = []
 
@@ -148,8 +148,9 @@ def select(stdscr, root, hidden):
         if action == 'reset':
             parent = Paths(root, hidden)
             parent.expand()
-            selected = []
+            curline = 0
             action = None
+            selected = []
         elif action == 'toggle_hidden':
             if hidden:
                 hidden = False
@@ -167,6 +168,8 @@ def select(stdscr, root, hidden):
         children = parent.traverse()
 
         for child, depth in children:
+            if depth == 0:  # don't create root node
+                continue
             if line == curline:
                 stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
                 if action == 'toggle_mark':
@@ -191,11 +194,11 @@ def select(stdscr, root, hidden):
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
-                              child.draw_line(depth, curses.COLS))
+                              child.draw_line(depth - 1, curses.COLS))
                 line += 1
 
         stdscr.refresh()
-        results = parse_keys(stdscr, curline)
+        results = parse_keys(stdscr, curline, line)
         if results:
             action = results[0]
             curline = results[1]
