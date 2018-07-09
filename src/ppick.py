@@ -48,15 +48,14 @@ class Paths:
                 yield f
 
     def render(self, depth, width):
-        padstr = ' ' * 4 * depth
+        pad = ' ' * 4 * depth
         icon1 = self.icon1()
         icon2 = self.icon2()
         node = os.path.basename(self.name)
-        nodestr = padstr + icon1 + ' ' + node + icon2
-        nodefmt = '{}'.format(nodestr)
-        return nodefmt + ' ' * (width - len(nodefmt))
+        nodestr = '{}{} {}{}'.format(pad, icon1, node, icon2)
+        return nodestr + ' ' * (width - len(nodestr))
 
-    def get_children(self):
+    def get_childpaths(self):
         if self.children is None:
             return
         if self.childpaths is None:
@@ -69,7 +68,7 @@ class Paths:
             return '   '
         elif self.expanded:
             return '[-]'
-        elif self.get_children():
+        elif self.get_childpaths():
             return '[+]'
         elif self.children is None:
             return '[?]'
@@ -100,12 +99,14 @@ class Paths:
 
     def traverse(self):
         yield self, 0
-        if not self.expanded:
-            return
 
-        for child in self.get_children():
-            for c, depth in child.traverse():
-                yield c, depth + 1
+        if os.path.isdir(self.name):
+            if not self.expanded:
+                return
+
+            for child in self.get_childpaths():
+                for c, depth in child.traverse():
+                    yield c, depth + 1
 
 
 def parse_keys(ch, curline):
