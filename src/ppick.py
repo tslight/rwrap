@@ -147,6 +147,7 @@ def select(stdscr, root, hidden):
     while True:
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_YELLOW)
 
         # to reset or toggle view of dotfiles we need to create a new Path
         # object before, erasing the screen & descending into draw loop.
@@ -177,7 +178,13 @@ def select(stdscr, root, hidden):
             if depth == 0:
                 continue  # don't draw root node
             if line == curline:
-                stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
+                # change color of current line depending on whether or not it's
+                # been selected.
+                if child.name in selected:
+                    stdscr.attrset(curses.color_pair(3))
+                else:
+                    stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
+
                 if action == 'toggle_mark':
                     if child.marked:
                         child.unmark()
@@ -188,6 +195,7 @@ def select(stdscr, root, hidden):
                         selected.append(child.name)
                         stdscr.attrset(curses.color_pair(2))
                     curline += 1
+
                 elif action == 'toggle_expand':
                     if child.expanded:
                         child.collapse()
