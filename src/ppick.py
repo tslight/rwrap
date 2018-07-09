@@ -181,7 +181,7 @@ def select(stdscr, root, hidden):
                 if child.name in selected:
                     child.mark()
 
-        stdscr.erase()  # https://stackoverflow.com/a/24966639
+        stdscr.erase()  # https://stackoverflow.com/a/24966639 - prevent flashes
 
         for child, depth in parent.traverse():
             if depth == 0:
