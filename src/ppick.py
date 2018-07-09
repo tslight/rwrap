@@ -114,18 +114,38 @@ def parse_keys(stdscr, curline, line):
     ch = stdscr.getch()
     if ch == ord('e') or ch == ord('q') or ch == ESC:
         return
-    elif ch == curses.KEY_UP or ch == ord('k') or ch == ord('p'):
-        curline -= 1
-    elif ch == curses.KEY_DOWN or ch == ord('j') or ch == ord('n'):
-        curline += 1
+    elif ch == ord('r'):
+        action = 'reset'
+    elif ch == ord('.'):
+        action = 'toggle_hidden'
     elif ch == curses.KEY_RIGHT or ch == ord('l') or ch == ord('f'):
         action = 'expand'
     elif ch == curses.KEY_LEFT or ch == ord('h') or ch == ord('b'):
         action = 'collapse'
-    elif ch == curses.KEY_RIGHT or ch == ord('L') or ch == ord('F'):
+    elif ch == ord('L') or ch == ord('F'):
         action = 'expand_all'
-    elif ch == curses.KEY_LEFT or ch == ord('H') or ch == ord('B'):
+    elif ch == ord('H') or ch == ord('B'):
         action = 'collapse_all'
+    elif ch == ord('\t') or ch == ord('\n'):
+        action = 'toggle_expand'
+    elif ch == ord('m') or ch == ord(' '):
+        action = 'toggle_mark'
+    elif ch == ord('J') or ch == ord('N'):
+        action = 'next_parent'
+    elif ch == ord('K') or ch == ord('P'):
+        action = 'prev_parent'
+    elif ch == ord('s') or ch == ord('?'):
+        action = 'get_size'
+    elif ch == ord('S'):
+        action = 'get_size_all'
+    elif ch == curses.KEY_UP or ch == ord('k') or ch == ord('p'):
+        curline -= 1
+    elif ch == curses.KEY_DOWN or ch == ord('j') or ch == ord('n'):
+        curline += 1
+    elif ch == curses.KEY_UP or ch == ord('k') or ch == ord('p'):
+        curline -= 1
+    elif ch == curses.KEY_DOWN or ch == ord('j') or ch == ord('n'):
+        curline += 1
     elif ch == curses.KEY_PPAGE or ch == ord('u') or ch == ord('V'):
         curline -= curses.LINES
         if curline < 0:
@@ -138,14 +158,6 @@ def parse_keys(stdscr, curline, line):
         curline = 0
     elif ch == curses.KEY_END or ch == ord('G') or ch == ord('>'):
         curline = line - 1
-    elif ch == ord('\t') or ch == ord('\n'):
-        action = 'toggle_expand'
-    elif ch == ord('m') or ch == ord(' '):
-        action = 'toggle_mark'
-    elif ch == ord('.'):
-        action = 'toggle_hidden'
-    elif ch == ord('r'):
-        action = 'reset'
     curline %= line
     return action, curline
 
@@ -198,7 +210,26 @@ def select(stdscr, root, hidden):
                 else:
                     stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
 
-                if action == 'toggle_mark':
+                if action == 'expand':
+                    child.expand()
+                    stdscr.attrset(curses.color_pair(0))
+                    curline += 1
+                elif action == 'collapse':
+                    child.collapse()
+                elif action == 'expand_all':
+                    for c, d in child.traverse():
+                        # only expand one level at a time
+                        if d > 1:
+                            continue
+                        c.expand()
+                elif action == 'collapse_all':
+                    pass
+                elif action == 'toggle_expand':
+                    if child.expanded:
+                        child.collapse()
+                    else:
+                        child.expand()
+                elif action == 'toggle_mark':
                     if child.marked:
                         child.unmark()
                         selected.remove(child.name)
@@ -208,25 +239,15 @@ def select(stdscr, root, hidden):
                         selected.append(child.name)
                         stdscr.attrset(curses.color_pair(2))
                     curline += 1
-
-                elif action == 'toggle_expand':
-                    if child.expanded:
-                        child.collapse()
-                    else:
-                        child.expand()
-                elif action == 'expand':
-                    child.expand()
-                    stdscr.attrset(curses.color_pair(0))
-                    curline += 1
-                elif action == 'expand_all':
-                    for c, d in child.traverse():
-                        c.expand()
-                elif action == 'collapse_all':
-                    for c, d in child.traverse():
-                        c.collapse()
-                elif action:
-                    getattr(child, action)()
-                action = None
+                elif action == 'next_parent':
+                    pass
+                elif action == 'prev_parent':
+                    pass
+                elif action == 'get_size':
+                    pass
+                elif action == 'get_size_all':
+                    pass
+                action = None  # reset action
             else:
                 stdscr.attrset(curses.color_pair(0))
                 # restore color to marked
@@ -237,8 +258,7 @@ def select(stdscr, root, hidden):
                 stdscr.addstr(line - offset, 0,
                               child.draw_line(depth - 1, curses.COLS))
 
-            # make sure this doesn't get added to an if block or scrolling breaks!
-            line += 1
+            line += 1  # keep scrolling!
 
         stdscr.refresh()
 
