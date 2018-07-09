@@ -140,8 +140,6 @@ def parse_keys(stdscr, curline, line):
         curline = line - 1
     elif ch == ord('\t') or ch == ord('\n'):
         action = 'toggle_expand'
-    elif ch == ord('t') or ch == ord('a'):
-        action = 'toggle_expand_all'
     elif ch == ord('m') or ch == ord(' '):
         action = 'toggle_mark'
     elif ch == ord('.'):
@@ -220,6 +218,12 @@ def select(stdscr, root, hidden):
                     child.expand()
                     stdscr.attrset(curses.color_pair(0))
                     curline += 1
+                elif action == 'expand_all':
+                    for c, d in child.traverse():
+                        c.expand()
+                elif action == 'collapse_all':
+                    for c, d in child.traverse():
+                        c.collapse()
                 elif action:
                     getattr(child, action)()
                 action = None
