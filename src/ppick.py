@@ -47,7 +47,7 @@ class Paths:
             if not f.startswith('.'):
                 yield f
 
-    def render(self, depth, width):
+    def draw_line(self, depth, width):
         pad = ' ' * 4 * depth
         icon1 = self.icon1()
         icon2 = self.icon2()
@@ -100,13 +100,12 @@ class Paths:
     def traverse(self):
         yield self, 0
 
-        if os.path.isdir(self.name):
-            if not self.expanded:
-                return
+        if not self.expanded:
+            return
 
-            for child in self.get_childpaths():
-                for c, depth in child.traverse():
-                    yield c, depth + 1
+        for child in self.get_childpaths():
+            for c, depth in child.traverse():
+                yield c, depth + 1
 
 
 def parse_keys(ch, curline):
@@ -187,7 +186,7 @@ def select(stdscr, root, hidden):
                 stdscr.attrset(curses.color_pair(0))
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
-                              child.render(depth, curses.COLS))
+                              child.draw_line(depth, curses.COLS))
                 line += 1
 
         stdscr.refresh()
