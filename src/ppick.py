@@ -43,7 +43,7 @@ class Paths:
         self.expanded = False
         self.marked = False
         self.getsize = False
-        self.size = None
+        self.size = ' '
 
     def listdir(self, path):
         for f in os.listdir(path):
@@ -82,8 +82,6 @@ class Paths:
     def icon2(self):
         if self.marked:
             return ' *'
-        else:
-            return ''
 
     def du(self):
         if self.getsize:
@@ -93,22 +91,16 @@ class Paths:
             self.size = "(" + size_ + ")"
             return self.size
         else:
-            if self.size is None:
-                return ''
-            else:
+            if self.size:
                 return self.size
 
     def expand(self):
         if os.path.isdir(self.name):
             self.expanded = True
-        else:
-            pass
 
     def collapse(self):
         if os.path.isdir(self.name):
             self.expanded = False
-        else:
-            pass
 
     def traverse(self):
         yield self, 0
