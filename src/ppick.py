@@ -241,7 +241,16 @@ def select(stdscr, root, hidden):
                         stdscr.attrset(curses.color_pair(2))
                     curline += 1
                 elif action == 'next_parent':
-                    pass
+                    # import pdb
+                    # pdb.set_trace()
+                    curchild = os.path.basename(child.name)
+                    curparent = os.path.dirname(child.name)
+                    par = Paths(curparent, hidden)
+                    for c in par.children:
+                        while c != curchild:
+                            continue
+                        curline += 1
+                    # pass
                 elif action == 'prev_parent':
                     pass
                 elif action == 'get_size':
