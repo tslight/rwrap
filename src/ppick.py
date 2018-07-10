@@ -245,18 +245,28 @@ def select(stdscr, root, hidden):
                     # pdb.set_trace()
                     cl = curline
                     lc = 0
-                    curpar = os.path.dirname(os.path.dirname(child.name))
-                    cpaths = Paths(curpar, hidden)
-                    curdir = os.path.basename(os.path.dirname(child.name))
-                    curidx = cpaths.children.index(curdir)
-                    nextdir = cpaths.children[curidx + 1]
-                    for c, d in parent.traverse():
-                        if os.path.basename(c.name) == nextdir:
-                            break
-                        if lc > cl:
-                            stdscr.attrset(curses.color_pair(0))
-                            curline += 1
-                        lc += 1
+                    if depth > 1:
+                        curpar = os.path.dirname(os.path.dirname(child.name))
+                        cpaths = Paths(curpar, hidden)
+                        curdir = os.path.basename(os.path.dirname(child.name))
+                        curidx = cpaths.children.index(curdir)
+                        nextdir = cpaths.children[curidx + 1]
+                        for c, d in parent.traverse():
+                            if os.path.basename(c.name) == nextdir:
+                                break
+                            if lc > cl:
+                                stdscr.attrset(curses.color_pair(0))
+                                curline += 1
+                            lc += 1
+                    else:
+                        # if we're in root then skip to next dir
+                        for c, d in parent.traverse():
+                            if lc > cl + 1:
+                                stdscr.attrset(curses.color_pair(0))
+                                curline += 1
+                                if os.path.isdir(c.name):
+                                    break
+                            lc += 1
                 elif action == 'prev_parent':
                     l = 0  # count lines again
                     p = os.path.dirname(child.name)
