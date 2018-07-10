@@ -243,16 +243,31 @@ def select(stdscr, root, hidden):
                 elif action == 'next_parent':
                     # import pdb
                     # pdb.set_trace()
-                    curchild = os.path.basename(child.name)
-                    curparent = os.path.dirname(child.name)
-                    par = Paths(curparent, hidden)
-                    for c in par.children:
-                        while c != curchild:
-                            continue
-                        curline += 1
-                    # pass
+                    cl = curline
+                    lc = 0
+                    curpar = Paths(os.path.dirname(
+                        os.path.dirname(child.name)), hidden)
+                    curdir = os.path.basename(os.path.dirname(child.name))
+                    curidx = curpar.children.index(curdir)
+                    nextdir = curpar.children[curidx + 1]
+                    for c, d in parent.traverse():
+                        if os.path.basename(c.name) == nextdir:
+                            break
+                        if lc > cl:
+                            stdscr.attrset(curses.color_pair(0))
+                            curline += 1
+                        lc += 1
                 elif action == 'prev_parent':
-                    pass
+                    l = 0  # count lines again
+                    p = os.path.dirname(child.name)
+                    # once we hit the parent directory, break, and set the
+                    # curline to the line number we got to.
+                    for c, d in parent.traverse():
+                        if c.name == p:
+                            break
+                        l += 1
+                    stdscr.attrset(curses.color_pair(0))
+                    curline = l
                 elif action == 'get_size':
                     pass
                 elif action == 'get_size_all':
