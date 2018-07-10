@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 """
 There are several general approaches to the drawing-an-outline problem. This
 program supports the following operations:
@@ -25,6 +25,7 @@ import random
 import os
 import sys
 import readline
+import size
 
 
 class Paths:
@@ -41,6 +42,7 @@ class Paths:
         self.childpaths = None
         self.expanded = False
         self.marked = False
+        self.getsize = False
 
     def listdir(self, path):
         for f in os.listdir(path):
@@ -51,8 +53,9 @@ class Paths:
         pad = ' ' * 4 * depth
         icon1 = self.icon1()
         icon2 = self.icon2()
+        size = self.size()
         node = os.path.basename(self.name)
-        nodestr = '{}{} {}{}'.format(pad, icon1, node, icon2)
+        nodestr = '{}{} {}{} {}'.format(pad, icon1, node, icon2, size)
         return nodestr + ' ' * (width - len(nodestr))
 
     def get_childpaths(self):
@@ -77,7 +80,15 @@ class Paths:
 
     def icon2(self):
         if self.marked:
-            return ' * '
+            return ' *'
+        else:
+            return ''
+
+    def size(self):
+        if self.getsize:
+            bytes_ = size.totalsize(self.name)
+            size_ = size.convert(bytes_)
+            return "(" + size_ + ")"
         else:
             return ''
 
@@ -96,6 +107,8 @@ class Paths:
     def mark(self): self.marked = True
 
     def unmark(self): self.marked = False
+
+    def getsize(self): self.getsize = True
 
     def traverse(self):
         yield self, 0
@@ -279,7 +292,7 @@ def select(stdscr, root, hidden):
                     stdscr.attrset(curses.color_pair(0))
                     curline = l
                 elif action == 'get_size':
-                    pass
+                    child.getsize = True
                 elif action == 'get_size_all':
                     pass
                 action = None  # reset action
