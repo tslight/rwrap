@@ -3,16 +3,16 @@
 There are several general approaches to the drawing-an-outline problem. This
 program supports the following operations:
 
-   - move cursor to previous item (in preorder traversal)
-   - move cursor to next item (likewise)
-   - hide descendants
-   - reveal children
+   - Navigate items using pre-order traversal, with arrow keys, Vi or Emacs
+     bindings.
+   - Expand or collapse children, one at time or all at once.
+   - Toggle marking of items, for use in selection mechanism for another module.
+   - Toggling display of toggle disk usage of an item, using size.py module.
 
-And because it runs over the filesystem, it must be at least somewhat lazy
-about expanding children.
+It runs over the filesystem, so it is somewhat lazy about expanding children.
 
-And it doesn't really bother to worry about someone else changing the outline
-behind its back.
+It doesn't really bother to worry about someone else changing the outline behind
+its back.
 
 So the strategy is to store our current linear position in the inorder
 traversal, and defer operations on the current node until the next time we're
@@ -39,7 +39,7 @@ class Paths:
                 self.children = sorted(os.listdir(name))
         except:
             self.children = None  # probably permission denied
-        self.childpaths = None
+        self.paths = None
         self.expanded = False
         self.marked = False
         self.getsize = False
@@ -50,36 +50,35 @@ class Paths:
             if not f.startswith('.'):
                 yield f
 
-    def draw_line(self, depth, width):
+    def drawline(self, depth, width):
         pad = ' ' * 4 * depth
-        icon1 = self.icon1()
-        icon2 = self.icon2()
+        mark = self.mark()
         size = self.du()
-        node = os.path.basename(self.name)
-        nodestr = '{}{} {}{} {}'.format(pad, icon1, node, icon2, size)
+        node = self.getnode()
+        nodestr = '{}{}{}{}'.format(pad, node, size, mark)
         return nodestr + ' ' * (width - len(nodestr))
 
-    def get_childpaths(self):
+    def getpaths(self):
         if self.children is None:
             return
-        if self.childpaths is None:
-            self.childpaths = [Paths(os.path.join(self.name, child), self.hidden)
-                               for child in self.children]
-        return self.childpaths
+        if self.paths is None:
+            self.paths = [Paths(os.path.join(self.name, child), self.hidden)
+                          for child in self.children]
+        return self.paths
 
-    def icon1(self):
+    def getnode(self):
         if not os.path.isdir(self.name):
-            return '   '
+            return '    ' + os.path.basename(self.name)
         elif self.expanded:
-            return '[-]'
-        elif self.get_childpaths():
-            return '[+]'
+            return '[-] ' + os.path.basename(self.name) + '/'
+        elif self.getpaths():
+            return '[+] ' + os.path.basename(self.name) + '/'
         elif self.children is None:
-            return '[?]'
+            return '[?] ' + os.path.basename(self.name) + '/'
         else:
-            return '[ ]'
+            return '[ ] ' + os.path.basename(self.name) + '/'
 
-    def icon2(self):
+    def mark(self):
         if self.marked:
             return ' *'
         else:
@@ -90,7 +89,7 @@ class Paths:
             bytes_ = size.totalsize(self.name)
             size_ = size.convert(bytes_)
             # save state as object attribute
-            self.size = "(" + size_ + ")"
+            self.size = " (" + size_ + ")"
             return self.size
         else:
             if self.size:
@@ -112,7 +111,7 @@ class Paths:
         if not self.expanded:
             return
 
-        for child in self.get_childpaths():
+        for child in self.getpaths():
             for c, depth in child.traverse():
                 yield c, depth + 1
 
@@ -289,7 +288,10 @@ def select(stdscr, root, hidden):
                     curline = l
                 elif action == 'get_size':
                     child.getsize = True
-                    stdscr.attrset(curses.color_pair(0))
+                    if child.name in selected:
+                        stdscr.attrset(curses.color_pair(2))
+                    else:
+                        stdscr.attrset(curses.color_pair(0))
                     curline += 1
                 elif action == 'get_size_all':
                     pass
@@ -302,7 +304,7 @@ def select(stdscr, root, hidden):
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
-                              child.draw_line(depth - 1, curses.COLS))
+                              child.drawline(depth - 1, curses.COLS))
 
             child.getsize = False
             line += 1  # keep scrolling!
