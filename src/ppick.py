@@ -23,9 +23,10 @@ import argparse
 import curses
 import random
 import os
-import sys
+import pdb
 import readline
 import size
+import sys
 
 
 class Paths:
@@ -181,16 +182,15 @@ def select(stdscr, root, hidden):
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+        curses.init_pair(4, curses.COLOR_BLUE, curses.COLOR_BLACK)
         offset = max(0, curline - curses.LINES + 10)
         line = 0
 
-        oldline = curline
         # to reset or toggle view of dotfiles we need to create a new Path
         # object before, erasing the screen & descending into draw loop.
         if action == 'reset':
             parent = Paths(root, hidden)
             parent.expand()
-            curline = oldline  # restore old position
             action = None
             selected = []
         elif action == 'toggle_hidden':
@@ -219,6 +219,8 @@ def select(stdscr, root, hidden):
                 else:
                     stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
 
+                cl = curline
+                lc = 0
                 if action == 'expand':
                     child.expand()
                     stdscr.attrset(curses.color_pair(0))
@@ -249,10 +251,6 @@ def select(stdscr, root, hidden):
                         stdscr.attrset(curses.color_pair(2))
                     curline += 1
                 elif action == 'next_parent':
-                    # import pdb
-                    # pdb.set_trace()
-                    cl = curline
-                    lc = 0
                     if depth > 1:
                         curpar = os.path.dirname(os.path.dirname(child.name))
                         cpaths = Paths(curpar, hidden)
@@ -276,16 +274,15 @@ def select(stdscr, root, hidden):
                                     break
                             lc += 1
                 elif action == 'prev_parent':
-                    l = 0  # count lines again
                     p = os.path.dirname(child.name)
                     # once we hit the parent directory, break, and set the
                     # curline to the line number we got to.
                     for c, d in parent.traverse():
                         if c.name == p:
                             break
-                        l += 1
+                        lc += 1
                     stdscr.attrset(curses.color_pair(0))
-                    curline = l
+                    curline = lc
                 elif action == 'get_size':
                     child.getsize = True
                     if child.name in selected:
@@ -294,13 +291,17 @@ def select(stdscr, root, hidden):
                         stdscr.attrset(curses.color_pair(0))
                     curline += 1
                 elif action == 'get_size_all':
-                    pass
+                    for c, d in parent.traverse():
+                        c.getsize = True
                 action = None  # reset action
             else:
-                stdscr.attrset(curses.color_pair(0))
                 # restore color to marked
                 if child.name in selected:
                     stdscr.attrset(curses.color_pair(2))
+                elif os.path.isdir(child.name):
+                    stdscr.attrset(curses.color_pair(4) | curses.A_BOLD)
+                else:
+                    stdscr.attrset(curses.color_pair(0))
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
