@@ -245,11 +245,11 @@ def select(stdscr, root, hidden):
                     # pdb.set_trace()
                     cl = curline
                     lc = 0
-                    curpar = Paths(os.path.dirname(
-                        os.path.dirname(child.name)), hidden)
+                    curpar = os.path.dirname(os.path.dirname(child.name))
+                    cpaths = Paths(curpar, hidden)
                     curdir = os.path.basename(os.path.dirname(child.name))
-                    curidx = curpar.children.index(curdir)
-                    nextdir = curpar.children[curidx + 1]
+                    curidx = cpaths.children.index(curdir)
+                    nextdir = cpaths.children[curidx + 1]
                     for c, d in parent.traverse():
                         if os.path.basename(c.name) == nextdir:
                             break
