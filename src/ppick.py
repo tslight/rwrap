@@ -43,6 +43,7 @@ class Paths:
         self.expanded = False
         self.marked = False
         self.getsize = False
+        self.size = None
 
     def listdir(self, path):
         for f in os.listdir(path):
@@ -53,7 +54,7 @@ class Paths:
         pad = ' ' * 4 * depth
         icon1 = self.icon1()
         icon2 = self.icon2()
-        size = self.size()
+        size = self.du()
         node = os.path.basename(self.name)
         nodestr = '{}{} {}{} {}'.format(pad, icon1, node, icon2, size)
         return nodestr + ' ' * (width - len(nodestr))
@@ -84,13 +85,18 @@ class Paths:
         else:
             return ''
 
-    def size(self):
+    def du(self):
         if self.getsize:
             bytes_ = size.totalsize(self.name)
             size_ = size.convert(bytes_)
-            return "(" + size_ + ")"
+            # save state as object attribute
+            self.size = "(" + size_ + ")"
+            return self.size
         else:
-            return ''
+            if self.size is None:
+                return ''
+            else:
+                return self.size
 
     def expand(self):
         if os.path.isdir(self.name):
@@ -103,12 +109,6 @@ class Paths:
             self.expanded = False
         else:
             pass
-
-    def mark(self): self.marked = True
-
-    def unmark(self): self.marked = False
-
-    def getsize(self): self.getsize = True
 
     def traverse(self):
         yield self, 0
@@ -245,11 +245,11 @@ def select(stdscr, root, hidden):
                         child.expand()
                 elif action == 'toggle_mark':
                     if child.marked:
-                        child.unmark()
+                        child.marked = False
                         selected.remove(child.name)
                         stdscr.attrset(curses.color_pair(0))
                     else:
-                        child.mark()
+                        child.marked = True
                         selected.append(child.name)
                         stdscr.attrset(curses.color_pair(2))
                     curline += 1
@@ -293,6 +293,8 @@ def select(stdscr, root, hidden):
                     curline = l
                 elif action == 'get_size':
                     child.getsize = True
+                    stdscr.attrset(curses.color_pair(0))
+                    curline += 1
                 elif action == 'get_size_all':
                     pass
                 action = None  # reset action
@@ -306,6 +308,7 @@ def select(stdscr, root, hidden):
                 stdscr.addstr(line - offset, 0,
                               child.draw_line(depth - 1, curses.COLS))
 
+            child.getsize = False
             line += 1  # keep scrolling!
 
         stdscr.refresh()
