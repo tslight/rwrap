@@ -28,6 +28,8 @@ import pdb
 import readline
 import sys
 
+from ccolor import Colors
+
 # Get more detailed traceback reports
 cgitb.enable(format="text")  # https://pymotw.com/2/cgitb/
 
@@ -172,46 +174,6 @@ class Paths:
                 yield c, depth + 1
 
 
-class Colors:
-    def __init__(self, stdscr, selected):
-        self.scr = stdscr
-        self.selected = selected
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
-        curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-        curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_YELLOW)
-
-    def reset(self):
-        self.scr.attrset(curses.color_pair(0))
-
-    def white_blue(self):
-        self.scr.attrset(curses.color_pair(1) | curses.A_BOLD)
-
-    def blue_black(self):
-        self.scr.attrset(curses.color_pair(2) | curses.A_BOLD)
-
-    def yellow_black(self):
-        self.scr.attrset(curses.color_pair(3))
-
-    def black_yellow(self):
-        self.scr.attrset(curses.color_pair(4))
-
-    def curline(self, path):
-        if path in self.selected:
-            self.black_yellow()
-        else:
-            self.white_blue()
-
-    def default(self, path):
-        # restore color to marked
-        if path in self.selected:
-            self.yellow_black()
-        elif os.path.isdir(path):
-            self.blue_black()
-        else:
-            self.reset()
-
-
 def parse_keys(stdscr, curline, line):
     ESC = 27
     action = None
@@ -281,7 +243,7 @@ def select(stdscr, root, hidden):
         # object before, erasing the screen & descending into draw loop.
         if action == 'reset':
             selected = []
-            parent = Paths(scr, root, hidden, selected)
+            parent = Paths(stdscr, root, hidden, selected)
             parent.expand()
             action = None
         elif action == 'toggle_hidden':
@@ -289,7 +251,7 @@ def select(stdscr, root, hidden):
                 hidden = False
             else:
                 hidden = True
-            parent = Paths(scr, root, hidden, selected)
+            parent = Paths(stdscr, root, hidden, selected)
             parent.expand()
             action = None
             # restore marked state
