@@ -20,6 +20,7 @@ traversing.
 """
 
 import argparse
+import cgitb
 import curses
 import random
 import os
@@ -27,6 +28,9 @@ import pdb
 import readline
 import size
 import sys
+
+# Get more detailed traceback reports
+cgitb.enable(format="text")  # https://pymotw.com/2/cgitb/
 
 
 class Paths:
@@ -140,6 +144,21 @@ class Colors:
     def black_yellow(self):
         self.scr.attrset(curses.color_pair(4))
 
+    def selected(self, path, selected):
+        if path in selected:
+            self.black_yellow()
+        else:
+            self.white_blue()
+
+    def default(self, path, selected):
+        # restore color to marked
+        if path in selected:
+            self.yellow_black()
+        elif os.path.isdir(path):
+            self.blue_black()
+        else:
+            self.reset()
+
 
 def parse_keys(stdscr, curline, line):
     ESC = 27
@@ -233,18 +252,14 @@ def select(stdscr, root, hidden):
             if depth == 0:
                 continue  # don't draw root node
             if line == curline:
-                # change color of current line depending on whether or not it's
-                # been selected.
-                if child.name in selected:
-                    colors.black_yellow()
-                else:
-                    colors.white_blue()
+                # selected line needs to be different than default
+                colors.selected(child.name, selected)
 
                 cl = curline
                 lc = 0
                 if action == 'expand':
                     child.expand()
-                    colors.reset()
+                    colors.default(child.name, selected)
                     curline += 1
                 elif action == 'collapse':
                     child.collapse()
@@ -265,7 +280,7 @@ def select(stdscr, root, hidden):
                     if child.marked:
                         child.marked = False
                         selected.remove(child.name)
-                        colors.reset()
+                        colors.default(child.name, selected)
                     else:
                         child.marked = True
                         selected.append(child.name)
@@ -282,14 +297,14 @@ def select(stdscr, root, hidden):
                             if os.path.basename(c.name) == nextdir:
                                 break
                             if lc > cl:
-                                colors.reset()
+                                colors.default(child.name, selected)
                                 curline += 1
                             lc += 1
                     else:
                         # if we're in root then skip to next dir
                         for c, d in parent.traverse():
                             if lc > cl + 1:
-                                colors.reset()
+                                colors.default(child.name, selected)
                                 curline += 1
                                 if os.path.isdir(c.name):
                                     break
@@ -302,27 +317,21 @@ def select(stdscr, root, hidden):
                         if c.name == p:
                             break
                         lc += 1
-                    colors_reset()
+                    colors.default(child.name, selected)
                     curline = lc
                 elif action == 'get_size':
                     child.getsize = True
                     if child.name in selected:
                         colors.yellow_black()
                     else:
-                        colors.reset()
+                        colors.default(child.name, selected)
                     curline += 1
                 elif action == 'get_size_all':
                     for c, d in parent.traverse():
                         c.getsize = True
                 action = None  # reset action
             else:
-                # restore color to marked
-                if child.name in selected:
-                    colors.yellow_black()
-                elif os.path.isdir(child.name):
-                    colors.blue_black()
-                else:
-                    colors.reset()
+                colors.default(child.name, selected)
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
