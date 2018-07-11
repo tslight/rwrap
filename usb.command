@@ -86,7 +86,16 @@ get_opts () {
 	OPTS+=(-v)
     fi
 
-    sudo rwrap "${OPTS[@]}" rsync://backup/mac
+    echo
+    read -rep "Enter mountpoint of backup drive: " drive
+
+    if [[ -d "$drive" ]]; then
+	sudo rwrap "${OPTS[@]}" "$drive"
+    else
+	echo
+	echo "Invalid Path. Aborting."
+	exit 1
+    fi
 
     echo "Finished running $TYPE script."
     echo
@@ -95,11 +104,16 @@ get_opts () {
 export -f ask
 export -f get_opts
 
-if [[ $(whoami) == "admin" ]]; then
-    get_opts
+# check if admin account exists
+if id admin &> /dev/null; then
+    if [[ $(whoami) == "admin" ]]; then
+	get_opts
+    else
+	echo
+	echo "Logging in as admin..."
+	echo
+	su admin -c 'get_opts'
+    fi
 else
-    echo
-    echo "Logging in as admin..."
-    echo
-    su admin -c 'get_opts'
+    get_opts
 fi
