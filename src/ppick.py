@@ -117,6 +117,30 @@ class Paths:
                 yield c, depth + 1
 
 
+class Colors:
+    def __init__(self, stdscr):
+        self.scr = stdscr
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+
+    def reset(self):
+        self.scr.attrset(curses.color_pair(0))
+
+    def white_blue(self):
+        self.scr.attrset(curses.color_pair(1) | curses.A_BOLD)
+
+    def blue_black(self):
+        self.scr.attrset(curses.color_pair(2) | curses.A_BOLD)
+
+    def yellow_black(self):
+        self.scr.attrset(curses.color_pair(3))
+
+    def black_yellow(self):
+        self.scr.attrset(curses.color_pair(4))
+
+
 def parse_keys(stdscr, curline, line):
     ESC = 27
     action = None
@@ -173,16 +197,13 @@ def parse_keys(stdscr, curline, line):
 
 def select(stdscr, root, hidden):
     parent = Paths(root, hidden)
-    parent.expand()
+    colors = Colors(stdscr)
     curline = 0
     action = None
     selected = []
+    parent.expand()
 
     while True:
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_YELLOW)
-        curses.init_pair(4, curses.COLOR_BLUE, curses.COLOR_BLACK)
         offset = max(0, curline - curses.LINES + 10)
         line = 0
 
@@ -215,15 +236,15 @@ def select(stdscr, root, hidden):
                 # change color of current line depending on whether or not it's
                 # been selected.
                 if child.name in selected:
-                    stdscr.attrset(curses.color_pair(3))
+                    colors.black_yellow()
                 else:
-                    stdscr.attrset(curses.color_pair(1) | curses.A_BOLD)
+                    colors.white_blue()
 
                 cl = curline
                 lc = 0
                 if action == 'expand':
                     child.expand()
-                    stdscr.attrset(curses.color_pair(0))
+                    colors.reset()
                     curline += 1
                 elif action == 'collapse':
                     child.collapse()
@@ -244,11 +265,11 @@ def select(stdscr, root, hidden):
                     if child.marked:
                         child.marked = False
                         selected.remove(child.name)
-                        stdscr.attrset(curses.color_pair(0))
+                        colors.reset()
                     else:
                         child.marked = True
                         selected.append(child.name)
-                        stdscr.attrset(curses.color_pair(2))
+                        colors.yellow_black()
                     curline += 1
                 elif action == 'next_parent':
                     if depth > 1:
@@ -261,14 +282,14 @@ def select(stdscr, root, hidden):
                             if os.path.basename(c.name) == nextdir:
                                 break
                             if lc > cl:
-                                stdscr.attrset(curses.color_pair(0))
+                                colors.reset()
                                 curline += 1
                             lc += 1
                     else:
                         # if we're in root then skip to next dir
                         for c, d in parent.traverse():
                             if lc > cl + 1:
-                                stdscr.attrset(curses.color_pair(0))
+                                colors.reset()
                                 curline += 1
                                 if os.path.isdir(c.name):
                                     break
@@ -281,14 +302,14 @@ def select(stdscr, root, hidden):
                         if c.name == p:
                             break
                         lc += 1
-                    stdscr.attrset(curses.color_pair(0))
+                    colors_reset()
                     curline = lc
                 elif action == 'get_size':
                     child.getsize = True
                     if child.name in selected:
-                        stdscr.attrset(curses.color_pair(2))
+                        colors.yellow_black()
                     else:
-                        stdscr.attrset(curses.color_pair(0))
+                        colors.reset()
                     curline += 1
                 elif action == 'get_size_all':
                     for c, d in parent.traverse():
@@ -297,11 +318,11 @@ def select(stdscr, root, hidden):
             else:
                 # restore color to marked
                 if child.name in selected:
-                    stdscr.attrset(curses.color_pair(2))
+                    colors.yellow_black()
                 elif os.path.isdir(child.name):
-                    stdscr.attrset(curses.color_pair(4) | curses.A_BOLD)
+                    colors.blue_black()
                 else:
-                    stdscr.attrset(curses.color_pair(0))
+                    colors.reset()
 
             if 0 <= line - offset < curses.LINES - 1:
                 stdscr.addstr(line - offset, 0,
