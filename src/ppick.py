@@ -63,6 +63,12 @@ class Paths:
         nodestr = '{}{}{}{}'.format(pad, node, size, mark)
         return nodestr + ' ' * (width - len(nodestr))
 
+    def drawlines(self, scr, depth, curline, line):
+        offset = max(0, curline - curses.LINES + 10)
+        if 0 <= line - offset < curses.LINES - 1:
+            scr.addstr(line - offset, 0,
+                       self.drawline(depth - 1, curses.COLS))
+
     def getpaths(self):
         if self.children is None:
             return
@@ -262,7 +268,7 @@ def select(stdscr, root, hidden):
     parent.expand()
 
     while True:
-        offset = max(0, curline - curses.LINES + 10)
+        # offset = max(0, curline - curses.LINES + 10)
         line = 0
 
         # to reset or toggle view of dotfiles we need to create a new Path
@@ -340,14 +346,13 @@ def select(stdscr, root, hidden):
                     for c, d in parent.traverse():
                         c.getsize = True
                 action = None  # reset action
+
             else:
                 colors.default(child.name, selected)
 
-            if 0 <= line - offset < curses.LINES - 1:
-                stdscr.addstr(line - offset, 0,
-                              child.drawline(depth - 1, curses.COLS))
+            child.drawlines(stdscr, depth, curline, line)
 
-            child.getsize = False
+            child.getsize = False  # stop computing sizes!
             line += 1  # keep scrolling!
 
         stdscr.refresh()
