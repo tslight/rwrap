@@ -110,6 +110,45 @@ class Paths:
         if os.path.isdir(self.name):
             self.expanded = False
 
+    def nextparent(self, colors, parent, path, curline, depth, selected):
+        line = 0
+        count = 0
+        if depth > 1:
+            curpar = os.path.dirname(os.path.dirname(path))
+            cpaths = Paths(curpar, hidden)
+            curdir = os.path.basename(os.path.dirname(path))
+            curidx = cpaths.children.index(curdir)
+            nextdir = cpaths.children[curidx + 1]
+            for c, d in parent.traverse():
+                if os.path.basename(c.name) == nextdir:
+                    break
+                if line > curline:
+                    colors.default(path, selected)
+                    count += 1
+                line += 1
+        else:
+            # if we're in root then skip to next dir
+            for c, d in self.traverse():
+                if line > curline + 1:
+                    colors.default(path, selected)
+                    count += 1
+                    if os.path.isdir(c.name):
+                        break
+                line += 1
+        return count
+
+    def prevparent(self, colors, parent, path, selected):
+        count = 0
+        p = os.path.dirname(path)
+        # once we hit the parent directory, break, and set the
+        # curline to the line number we got to.
+        for c, d in parent.traverse():
+            if c.name == p:
+                break
+            count += 1
+        colors.default(path, selected)
+        return count
+
     def traverse(self):
         yield self, 0
 
@@ -288,44 +327,14 @@ def select(stdscr, root, hidden):
                         colors.yellow_black()
                     curline += 1
                 elif action == 'next_parent':
-                    if depth > 1:
-                        curpar = os.path.dirname(os.path.dirname(child.name))
-                        cpaths = Paths(curpar, hidden)
-                        curdir = os.path.basename(os.path.dirname(child.name))
-                        curidx = cpaths.children.index(curdir)
-                        nextdir = cpaths.children[curidx + 1]
-                        for c, d in parent.traverse():
-                            if os.path.basename(c.name) == nextdir:
-                                break
-                            if lc > cl:
-                                colors.default(child.name, selected)
-                                curline += 1
-                            lc += 1
-                    else:
-                        # if we're in root then skip to next dir
-                        for c, d in parent.traverse():
-                            if lc > cl + 1:
-                                colors.default(child.name, selected)
-                                curline += 1
-                                if os.path.isdir(c.name):
-                                    break
-                            lc += 1
+                    curline += child.nextparent(
+                        colors, parent, child.name, curline, depth, selected)
                 elif action == 'prev_parent':
-                    p = os.path.dirname(child.name)
-                    # once we hit the parent directory, break, and set the
-                    # curline to the line number we got to.
-                    for c, d in parent.traverse():
-                        if c.name == p:
-                            break
-                        lc += 1
-                    colors.default(child.name, selected)
-                    curline = lc
+                    curline = child.prevparent(
+                        colors, parent, child.name, selected)
                 elif action == 'get_size':
                     child.getsize = True
-                    if child.name in selected:
-                        colors.yellow_black()
-                    else:
-                        colors.default(child.name, selected)
+                    colors.default(child.name, selected)
                     curline += 1
                 elif action == 'get_size_all':
                     for c, d in parent.traverse():
