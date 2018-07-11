@@ -33,9 +33,12 @@ cgitb.enable(format="text")  # https://pymotw.com/2/cgitb/
 
 
 class Paths:
-    def __init__(self, name, hidden):
+    def __init__(self, scr, name, hidden, selected):
+        self.scr = scr
         self.name = name
         self.hidden = hidden
+        self.selected = selected
+        self.colors = Colors(self.scr, self.selected)
         try:
             if self.hidden:
                 self.children = sorted(self.listdir(name))
@@ -62,17 +65,19 @@ class Paths:
         nodestr = '{}{}{}{}'.format(pad, node, size, mark)
         return nodestr + ' ' * (width - len(nodestr))
 
-    def drawlines(self, scr, depth, curline, line):
+    def drawlines(self, depth, curline, line):
         offset = max(0, curline - curses.LINES + 10)
+        y = line - offset
+        x = 0
+        string = self.drawline(depth - 1, curses.COLS)
         if 0 <= line - offset < curses.LINES - 1:
-            scr.addstr(line - offset, 0,
-                       self.drawline(depth - 1, curses.COLS))
+            self.scr.addstr(y, x, string)  # paint str at y, x co-ordinates
 
     def getpaths(self):
         if self.children is None:
             return
         if self.paths is None:
-            self.paths = [Paths(os.path.join(self.name, child), self.hidden)
+            self.paths = [Paths(self.scr, os.path.join(self.name, child), self.hidden, self.selected)
                           for child in self.children]
         return self.paths
 
@@ -110,17 +115,19 @@ class Paths:
     def expand(self):
         if os.path.isdir(self.name):
             self.expanded = True
+            # self.colors.default(self.name)
 
     def collapse(self):
         if os.path.isdir(self.name):
             self.expanded = False
 
-    def nextparent(self, colors, parent, path, curline, depth, selected):
+    # next & prev parent need a lot of love. multiple bugs!
+    def nextparent(self, parent, path, curline, depth):
         line = 0
         count = 0
         if depth > 1:
             curpar = os.path.dirname(os.path.dirname(path))
-            cpaths = Paths(curpar, hidden)
+            cpaths = Paths(self.scr, curpar, self.hidden, self.selected)
             curdir = os.path.basename(os.path.dirname(path))
             curidx = cpaths.children.index(curdir)
             nextdir = cpaths.children[curidx + 1]
@@ -128,21 +135,21 @@ class Paths:
                 if os.path.basename(c.name) == nextdir:
                     break
                 if line > curline:
-                    colors.default(path, selected)
+                    self.colors.default(path)
                     count += 1
                 line += 1
         else:
             # if we're in root then skip to next dir
-            for c, d in self.traverse():
+            for c, d in parent.traverse():
                 if line > curline + 1:
-                    colors.default(path, selected)
+                    self.colors.default(path)
                     count += 1
                     if os.path.isdir(c.name):
                         break
                 line += 1
         return count
 
-    def prevparent(self, colors, parent, path, selected):
+    def prevparent(self, parent, path):
         count = 0
         p = os.path.dirname(path)
         # once we hit the parent directory, break, and set the
@@ -151,7 +158,7 @@ class Paths:
             if c.name == p:
                 break
             count += 1
-        colors.default(path, selected)
+        self.colors.default(path)
         return count
 
     def traverse(self):
@@ -166,8 +173,9 @@ class Paths:
 
 
 class Colors:
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, selected):
         self.scr = stdscr
+        self.selected = selected
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
@@ -188,15 +196,15 @@ class Colors:
     def black_yellow(self):
         self.scr.attrset(curses.color_pair(4))
 
-    def selected(self, path, selected):
-        if path in selected:
+    def curline(self, path):
+        if path in self.selected:
             self.black_yellow()
         else:
             self.white_blue()
 
-    def default(self, path, selected):
+    def default(self, path):
         # restore color to marked
-        if path in selected:
+        if path in self.selected:
             self.yellow_black()
         elif os.path.isdir(path):
             self.blue_black()
@@ -259,12 +267,11 @@ def parse_keys(stdscr, curline, line):
 
 
 def select(stdscr, root, hidden):
-    parent = Paths(root, hidden)
-    colors = Colors(stdscr)
+    selected = []
+    parent = Paths(stdscr, root, hidden, selected)
+    parent.expand()
     curline = 0
     action = None
-    selected = []
-    parent.expand()
 
     while True:
         # offset = max(0, curline - curses.LINES + 10)
@@ -273,16 +280,16 @@ def select(stdscr, root, hidden):
         # to reset or toggle view of dotfiles we need to create a new Path
         # object before, erasing the screen & descending into draw loop.
         if action == 'reset':
-            parent = Paths(root, hidden)
+            selected = []
+            parent = Paths(scr, root, hidden, selected)
             parent.expand()
             action = None
-            selected = []
         elif action == 'toggle_hidden':
             if hidden:
                 hidden = False
             else:
                 hidden = True
-            parent = Paths(root, hidden)
+            parent = Paths(scr, root, hidden, selected)
             parent.expand()
             action = None
             # restore marked state
@@ -297,11 +304,11 @@ def select(stdscr, root, hidden):
                 continue  # don't draw root node
             if line == curline:
                 # selected line needs to be different than default
-                colors.selected(child.name, selected)
+                child.colors.curline(child.name)
 
                 if action == 'expand':
                     child.expand()
-                    colors.default(child.name, selected)
+                    child.colors.default(child.name)
                     curline += 1
                 elif action == 'collapse':
                     child.collapse()
@@ -322,21 +329,20 @@ def select(stdscr, root, hidden):
                     if child.marked:
                         child.marked = False
                         selected.remove(child.name)
-                        colors.default(child.name, selected)
+                        child.colors.default(child.name)
                     else:
                         child.marked = True
                         selected.append(child.name)
-                        colors.yellow_black()
+                        child.colors.yellow_black()
                     curline += 1
                 elif action == 'next_parent':
-                    curline += child.nextparent(
-                        colors, parent, child.name, curline, depth, selected)
+                    curline += child.nextparent(parent,
+                                                child.name, curline, depth)
                 elif action == 'prev_parent':
-                    curline = child.prevparent(
-                        colors, parent, child.name, selected)
+                    curline = child.prevparent(parent, child.name)
                 elif action == 'get_size':
                     child.getsize = True
-                    colors.default(child.name, selected)
+                    child.colors.default(child.name)
                     curline += 1
                 elif action == 'get_size_all':
                     for c, d in parent.traverse():
@@ -344,9 +350,9 @@ def select(stdscr, root, hidden):
                 action = None  # reset action
 
             else:
-                colors.default(child.name, selected)
+                child.colors.default(child.name)
 
-            child.drawlines(stdscr, depth, curline, line)
+            child.drawlines(depth, curline, line)
 
             child.getsize = False  # stop computing sizes!
             line += 1  # keep scrolling!
