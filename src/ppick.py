@@ -255,8 +255,9 @@ def select(stdscr, root, hidden):
                 # selected line needs to be different than default
                 colors.selected(child.name, selected)
 
-                cl = curline
-                lc = 0
+                cl = curline  # for use in parent jump actions
+                lc = 0  # for use in parent jump actions
+
                 if action == 'expand':
                     child.expand()
                     colors.default(child.name, selected)
