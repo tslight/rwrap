@@ -22,11 +22,10 @@ traversing.
 import argparse
 import cgitb
 import curses
-import random
+import du
 import os
 import pdb
 import readline
-import size
 import sys
 
 # Get more detailed traceback reports
@@ -97,8 +96,8 @@ class Paths:
 
     def du(self):
         if self.getsize:
-            bytes_ = size.totalsize(self.name)
-            size_ = size.convert(bytes_)
+            bytes_ = du.size(self.name)
+            size_ = du.convert(bytes_)
             # save state as object attribute
             self.size = " (" + size_ + ")"
             return self.size
