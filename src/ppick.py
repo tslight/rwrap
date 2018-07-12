@@ -75,14 +75,6 @@ class Paths:
         if 0 <= line - offset < curses.LINES - 1:
             self.scr.addstr(y, x, string)  # paint str at y, x co-ordinates
 
-    def getpaths(self):
-        if self.children is None:
-            return
-        if self.paths is None:
-            self.paths = [Paths(self.scr, os.path.join(self.name, child), self.hidden, self.selected)
-                          for child in self.children]
-        return self.paths
-
     def getnode(self):
         if not os.path.isdir(self.name):
             return '    ' + os.path.basename(self.name)
@@ -163,8 +155,21 @@ class Paths:
         self.colors.default(path)
         return count
 
-    # Recursive generator function that lazily unfolds the filesystem
+    def getpaths(self):
+        '''
+        If we have children, use a list comprehension to instantiate new paths objects to traverse.
+        '''
+        if self.children is None:
+            return
+        if self.paths is None:
+            self.paths = [Paths(self.scr, os.path.join(self.name, child), self.hidden, self.selected)
+                          for child in self.children]
+        return self.paths
+
     def traverse(self):
+        '''
+        Recursive generator that lazily unfolds the filesystem.
+        '''
         yield self, 0
 
         if not self.expanded:
@@ -237,7 +242,6 @@ def select(stdscr, root, hidden):
     action = None
 
     while True:
-        # offset = max(0, curline - curses.LINES + 10)
         line = 0
 
         # to reset or toggle view of dotfiles we need to create a new Path
