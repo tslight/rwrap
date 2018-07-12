@@ -163,6 +163,7 @@ class Paths:
         self.colors.default(path)
         return count
 
+    # Recursive generator function that lazily unfolds the filesystem
     def traverse(self):
         yield self, 0
 
