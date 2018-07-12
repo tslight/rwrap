@@ -116,54 +116,60 @@ class Paths:
             self.expanded = False
 
     # next & prev parent need a lot of love. multiple bugs!
-    def nextparent(self, parent, path, curline, depth):
+    def nextparent(self, parent, curline, depth):
         line = 0
         count = 0
         if depth > 1:
-            curpar = os.path.dirname(os.path.dirname(path))
+            curpar = os.path.dirname(os.path.dirname(self.name))
             cpaths = Paths(self.scr, curpar, self.hidden, self.selected)
-            curdir = os.path.basename(os.path.dirname(path))
+            curdir = os.path.basename(os.path.dirname(self.name))
             curidx = cpaths.children.index(curdir)
             nextdir = cpaths.children[curidx + 1]
             for c, d in parent.traverse():
                 if os.path.basename(c.name) == nextdir:
                     break
                 if line > curline:
-                    self.colors.default(path)
+                    self.colors.default(self.name)
                     count += 1
                 line += 1
         else:
             # if we're in root then skip to next dir
             for c, d in parent.traverse():
                 if line > curline + 1:
-                    self.colors.default(path)
+                    self.colors.default(self.name)
                     count += 1
                     if os.path.isdir(c.name):
                         break
                 line += 1
         return count
 
-    def prevparent(self, parent, path):
+    def prevparent(self, parent):
+        '''
+        Count lines from top of parent until we reach our current path and then
+        return that count so that we can set curline to it.
+        '''
         count = 0
-        p = os.path.dirname(path)
+        p = os.path.dirname(self.name)
         # once we hit the parent directory, break, and set the
         # curline to the line number we got to.
         for c, d in parent.traverse():
             if c.name == p:
                 break
             count += 1
-        self.colors.default(path)
+        self.colors.default(self.name)
         return count
 
     def getpaths(self):
         '''
-        If we have children, use a list comprehension to instantiate new paths objects to traverse.
+        If we have children, use a list comprehension to instantiate new paths
+        objects to traverse.
         '''
         if self.children is None:
             return
         if self.paths is None:
-            self.paths = [Paths(self.scr, os.path.join(self.name, child), self.hidden, self.selected)
-                          for child in self.children]
+            self.paths = [Paths(
+                self.scr, os.path.join(self.name, child), self.hidden, self.selected)
+                for child in self.children]
         return self.paths
 
     def traverse(self):
@@ -303,10 +309,9 @@ def select(stdscr, root, hidden):
                         child.colors.yellow_black()
                     curline += 1
                 elif action == 'next_parent':
-                    curline += child.nextparent(parent,
-                                                child.name, curline, depth)
+                    curline += child.nextparent(parent, curline, depth)
                 elif action == 'prev_parent':
-                    curline = child.prevparent(parent, child.name)
+                    curline = child.prevparent(parent)
                 elif action == 'get_size':
                     child.getsize = True
                     child.colors.default(child.name)
