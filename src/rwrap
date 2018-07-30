@@ -688,8 +688,6 @@ copywrap () {
 	checkdir "$rsync_tmp/Users/$user/$date"
 	chown -R "$user":"$group" "$rsync_tmp/Users/$user"
 	rsync "${opts[@]}" "$rsync_tmp/" "$MOUNT"
-	copydir "$src" "$dest" "$log"
-	rsync "${opts[@]}" "$rsync_tmp/" "$MOUNT"
     else
 	logpath="$MOUNT/Logs/$TYPE/$user"
 	log="$logpath/$date.log"
