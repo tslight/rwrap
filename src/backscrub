@@ -40,7 +40,7 @@ get_lib () {
     fi
 }
 
-get_backupdir () {
+get_bkupdir () {
     read -rep "Enter a backup directory: " BACKUPDIR
 }
 
@@ -114,7 +114,7 @@ main () {
 
     get_lib
 
-    [[ -z "$1" ]] && get_backdir || BACKUPDIR="$1"
+    [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
     [[ -z "$2" ]] && get_days || DAYS="$2"
 
     chkroot
