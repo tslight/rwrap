@@ -29,6 +29,7 @@ get_lib () {
 	for m in "${MODULES[@]}"; do
 	    if bashport "$m"; then
 		echo "Successfully imported $m library."
+		export -f "$m"
 	    else
 		echo "Cannot find $m library. Aborting"
 		exit 1
