@@ -96,8 +96,6 @@ delete_olddirs () {
 main () {
     local total=0
 
-    get_lib
-
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
     [[ -z "$2" ]] && get_days || DAYS="$2"
 
