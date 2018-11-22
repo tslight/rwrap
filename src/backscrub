@@ -7,9 +7,9 @@ GROUP="Users_UKGroupSeniorManagement"
 KEY11=()
 OLDBACKUPS=()
 MODULES=(
-    ask
-    chkroot
-    chkdirs
+    'ask'
+    'chkroot'
+    'chkdirs'
 )
 
 usage () {
@@ -27,16 +27,16 @@ sort_array () {
 get_lib () {
     if command -v bashport &>/dev/null; then
 	for m in "${MODULES[@]}"; do
-	    echo "Importing $m library from libbash."
 	    if bashport "$m"; then
 		echo "Successfully imported $m library."
 	    else
 		echo "Cannot find $m library. Aborting"
-		exit
+		exit 1
 	    fi
 	done
     else
 	echo "Cannot find bashport command. Have you installed libbash?"
+	exit 1
     fi
 }
 
