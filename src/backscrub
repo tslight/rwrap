@@ -24,23 +24,6 @@ sort_array () {
     unset IFS
 }
 
-get_lib () {
-    if command -v bashport &>/dev/null; then
-	for m in "${MODULES[@]}"; do
-	    if bashport "$m"; then
-		echo "Successfully imported $m library."
-		export -f "$m"
-	    else
-		echo "Cannot find $m library. Aborting"
-		exit 1
-	    fi
-	done
-    else
-	echo "Cannot find bashport command. Have you installed libbash?"
-	exit 1
-    fi
-}
-
 get_bkupdir () {
     read -rep "Enter a backup directory: " BACKUPDIR
 }
@@ -135,5 +118,20 @@ main () {
 
     mkplate "$LOG" "$SELF" "Finish"
 }
+
+if command -v bashport &>/dev/null; then
+    for m in "${MODULES[@]}"; do
+	if bashport "$m"; then
+	    echo "Successfully imported $m library."
+	    export -f "$m"
+	else
+	    echo "Cannot find $m library. Aborting"
+	    exit 1
+	fi
+    done
+else
+    echo "Cannot find bashport command. Have you installed libbash?"
+    exit 1
+fi
 
 main "$@"
