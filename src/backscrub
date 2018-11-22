@@ -6,6 +6,11 @@ BACKUPS=($BACKUPDIR/*)
 GROUP="Users_UKGroupSeniorManagement"
 KEY11=()
 OLDBACKUPS=()
+MODULES=(
+    ask
+    chkroot
+    chkdirs
+)
 
 usage () {
     echo "
@@ -20,11 +25,18 @@ sort_array () {
 }
 
 get_lib () {
-    if [[ -f "$HOME"/bin/tsutils ]]; then
-	source "$HOME"/bin/tsutils
+    if command -v bashport &>/dev/null; then
+	for m in "${MODULES[@]}"; do
+	    echo "Importing $m library from libbash."
+	    if bashport "$m"; then
+		echo "Successfully imported $m library."
+	    else
+		echo "Cannot find $m library. Aborting"
+		exit
+	    fi
+	done
     else
-	echo "Cannot find tsutils library. Aborting."
-	exit 1
+	echo "Cannot find bashport command. Have you installed libbash?"
     fi
 }
 
