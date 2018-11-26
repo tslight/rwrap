@@ -95,10 +95,11 @@ delete_olddirs () {
 main () {
     local total=0
 
+    chkroot
+
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
     [[ -z "$2" ]] && get_days || DAYS="$2"
 
-    chkroot
     chkdirs || { usage; exit 1; }
     mkplate "$LOG" "$SELF" "Start"
 
