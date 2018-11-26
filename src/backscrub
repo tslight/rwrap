@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 
+source "$HOME"/lib/bash/ask
+source "$HOME"/lib/bash/chkroot
+source "$HOME"/lib/bash/chkdirs
+
 SELF="$(basename "$0")"
 LOG="/var/log/$SELF-$(date +%Y.%m.%d).log"
 BACKUPS=($BACKUPDIR/*)
 GROUP="Users_UKGroupSeniorManagement"
 KEY11=()
 OLDBACKUPS=()
-MODULES=(
-    'ask'
-    'chkroot'
-    'chkdirs'
-)
 
 usage () {
     echo "
