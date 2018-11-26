@@ -99,11 +99,11 @@ main () {
     chkroot
 
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
-    [[ -z "$2" ]] && get_days || DAYS="$2"
-
     chkdirs "$BACKUPDIR" || { usage; exit 1; }
-
     BACKUPS=($BACKUPDIR/*)
+
+    [[ -z "$2" ]] && get_days || DAYS="$2"
+    [[ $DAYS =~ ^[0-9]+$ ]] || { usage; exit 1; }
 
     mkplate "$LOG" "$SELF" "Start"
 
