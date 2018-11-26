@@ -3,6 +3,7 @@
 source "$HOME"/lib/bash/ask
 source "$HOME"/lib/bash/chkroot
 source "$HOME"/lib/bash/chkdirs
+source "$HOME"/lib/bash/plate
 
 SELF="$(basename "$0")"
 LOG="/var/log/$SELF-$(date +%Y.%m.%d).log"
