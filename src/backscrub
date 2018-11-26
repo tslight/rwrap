@@ -103,7 +103,7 @@ main () {
     BACKUPS=($BACKUPDIR/*)
 
     [[ -z "$2" ]] && get_days || DAYS="$2"
-    [[ $DAYS =~ ^[0-9]+$ ]] || { usage; exit 1; }
+    [[ $DAYS =~ ^[0-9]+$ ]] || { echo "Invalid integer."; usage; exit 1; }
 
     mkplate "$LOG" "$SELF" "Start"
 
