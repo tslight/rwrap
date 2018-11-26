@@ -8,7 +8,6 @@ source "$HOME"/lib/bash/plate
 
 SELF="$(basename "$0")"
 LOG="/var/log/$SELF-$(date +%Y.%m.%d).log"
-BACKUPS=($BACKUPDIR/*)
 GROUP="Users_UKGroupSeniorManagement"
 KEY11=()
 OLDBACKUPS=()
@@ -102,7 +101,10 @@ main () {
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
     [[ -z "$2" ]] && get_days || DAYS="$2"
 
-    chkdirs || { usage; exit 1; }
+    chkdirs "$BACKUPDIR" || { usage; exit 1; }
+
+    BACKUPS=($BACKUPDIR/*)
+
     mkplate "$LOG" "$SELF" "Start"
 
     echo "Searching for Key 11 users in AD (might take a while)..."
@@ -118,20 +120,5 @@ main () {
 
     mkplate "$LOG" "$SELF" "Finish"
 }
-
-if command -v bashport &>/dev/null; then
-    for m in "${MODULES[@]}"; do
-	if bashport "$m"; then
-	    echo "Successfully imported $m library."
-	    export -f "$m"
-	else
-	    echo "Cannot find $m library. Aborting"
-	    exit 1
-	fi
-    done
-else
-    echo "Cannot find bashport command. Have you installed libbash?"
-    exit 1
-fi
 
 main "$@"
