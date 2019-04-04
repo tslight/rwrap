@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-source "$HOME"/lib/bash/ask
-source "$HOME"/lib/bash/chkroot
-source "$HOME"/lib/bash/chkdirs
-source "$HOME"/lib/bash/convert
-source "$HOME"/lib/bash/plate
-
+LIB="/usr/local/lib/bash"
+[[ -d "$LIB" ]] || { echo "$LIB doesn't exist. Aborting"; exit 1; }
+for l in "$LIB"/*; do
+    source "$l" || { echo "$l not found"; exit 1; }
+done
 SELF="$(basename "$0")"
 LOG="/var/log/$SELF-$(date +%Y.%m.%d).log"
 OLDBACKUPS=()
@@ -33,6 +32,7 @@ get_olddirs () {
 }
 
 delete_olddirs () {
+    local automate="$1"
     local -i size total
     local hrsize hrtotal
 
@@ -40,16 +40,16 @@ delete_olddirs () {
 	size=$(du -sb "$d" | awk 'NF{NF--};1') # https://unix.stackexchange.com/a/234436
 	hrsize=$(convert "$size")
 	if ask "Would you like to delete $d ($hrsize) ? "; then
-	    echo "Deleting $d ($hrsize)..." | tee -a "$LOG"
+	    echo "Deleting $d ($hrsize)..."
 	    total+="$size"
 	    rm -rf "$d"
 	else
-	    echo "Not deleting $d." | tee -a "$LOG"
+	    echo "Not deleting $d."
 	fi
     done
 
     hrtotal=$(convert "$total")
-    echo "Successfully freed $hrtotal." | tee -a "$LOG"
+    echo "Successfully freed $hrtotal."
 }
 
 main () {
@@ -68,11 +68,11 @@ main () {
 
     mkplate "$LOG" "$SELF" "Start"
 
-    echo "Getting directories in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
+    echo "Getting directories in $BACKUPDIR older than $DAYS days..."
     get_olddirs "$DAYS"
     delete_olddirs
 
     mkplate "$LOG" "$SELF" "Finish"
 }
 
-main "$@"
+main "$@" 2>&1 | tee -a "$LOG"
