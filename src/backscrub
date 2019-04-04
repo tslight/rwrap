@@ -11,7 +11,7 @@ OLDBACKUPS=()
 
 usage () {
     echo "
-$(basename "$0") [NUMBER OF DAYS]
+$(basename "$0") [PATH] [NUMBER OF DAYS]
 "
 }
 
