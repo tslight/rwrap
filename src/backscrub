@@ -40,20 +40,23 @@ delete_olddirs () {
 	size=$(du -sb "$d" | awk 'NF{NF--};1') # https://unix.stackexchange.com/a/234436
 	hrsize=$(convert "$size")
 	if ask "Would you like to delete $d ($hrsize) ? "; then
-	    echo "Deleting $d ($hrsize)..."
+	    echo "Deleting $d ($hrsize)..." | tee -a "$LOG"
 	    total+="$size"
 	    rm -rf "$d"
 	else
-	    echo "Not deleting $d."
+	    echo "Not deleting $d." | tee -a "$LOG"
 	fi
     done
 
     hrtotal=$(convert "$total")
-    echo "Successfully freed $hrtotal."
+    echo "Successfully freed $hrtotal." | tee -a "$LOG"
 }
 
 main () {
     local total=0
+
+    [[ "$1" =~ -h|help|--help ]] && { usage; exit 0; }
+    chkroot
 
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
     chkdirs "$BACKUPDIR" || { usage; exit 1; }
@@ -64,13 +67,11 @@ main () {
 
     mkplate "$LOG" "$SELF" "Start"
 
-    echo "Getting directories in $BACKUPDIR older than $DAYS days..."
-    get_olddirs "$DAYS"
+    echo "Getting backups in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
+    get_olddirs
     delete_olddirs
 
     mkplate "$LOG" "$SELF" "Finish"
 }
 
-[[ "$1" =~ -h|help|--help ]] && { usage; exit 0; }
-chkroot
-main "$@" 2>&1 | tee -a "$LOG"
+main "$@"
