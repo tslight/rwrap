@@ -68,11 +68,11 @@ main () {
 
     mkplate "$LOG" "$SELF" "Start"
 
-    echo "Getting directories in $BACKUPDIR older than $DAYS days..."
-    get_olddirs "$DAYS"
-    delete_olddirs
+    echo "Getting directories in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
+    get_olddirs "$DAYS" 2>&1 | tee -a "$LOG"
+    delete_olddirs  2>&1 | tee -a "$LOG"
 
     mkplate "$LOG" "$SELF" "Finish"
 }
 
-main "$@" 2>&1 | tee -a "$LOG"
+main "$@"
