@@ -8,6 +8,8 @@ source "$HOME"/lib/bash/plate
 
 SELF="$(basename "$0")"
 LOG="/var/log/$SELF-$(date +%Y.%m.%d).log"
+GROUP="Users_UKGroupSeniorManagement"
+KEY11=()
 OLDBACKUPS=()
 
 usage () {
@@ -16,12 +18,51 @@ $(basename "$0") [NUMBER OF DAYS]
 "
 }
 
+sort_array () {
+    IFS=$'\n'
+    KEY11=($(sort <<<"${KEY11[*]}"))
+    unset IFS
+}
+
 get_bkupdir () {
     read -rep "Enter a backup directory: " BACKUPDIR
 }
 
 get_days () {
     read -rep "Enter a number of days: " DAYS
+}
+
+get_key11 () {
+    USERS=($(getent passwd | cut -d ":" -f 1))
+    for u in "${USERS[@]}"; do
+	if id "$u" | grep -qi "$GROUP"; then
+	    KEY11+=("$u")
+	fi
+    done
+}
+
+log_key11 () {
+    echo "Found the following Key 11 members:" >> "$LOG"
+    for k in "${KEY11[@]}"; do
+	echo "$GROUP: ${k##*\\}" >> "$LOG"
+    done
+}
+
+remove_key11 () {
+    local ksam dir dsam
+
+    for k in "${KEY11[@]}"; do
+	ksam="${k##*\\}" # param substitution to remove domain & get sam name
+	# ! assigns d to element index instead of element value
+	for d in "${!BACKUPS[@]}"; do
+	    dir="${BACKUPS[d]}" # get elem value
+	    dsam="${dir##*/}" # param substitution to remove path & get sam name
+	    if [[ "$ksam" == "$dsam" ]]; then
+		echo "Found backup for $ksam at $dir. Leaving alone!" | tee -a "$LOG"
+		unset "BACKUPS[d]"
+	    fi
+	done
+    done
 }
 
 get_olddirs () {
@@ -67,6 +108,13 @@ main () {
     [[ $DAYS =~ ^[0-9]+$ ]] || { echo "Invalid integer."; usage; exit 1; }
 
     mkplate "$LOG" "$SELF" "Start"
+
+    echo "Searching for Key 11 users in AD (might take a while)..."
+    get_key11 &>/dev/null
+    sort_array
+
+    log_key11
+    remove_key11
 
     echo "Getting directories in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
     get_olddirs "$DAYS"
