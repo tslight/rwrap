@@ -55,10 +55,6 @@ delete_olddirs () {
 main () {
     local total=0
 
-    [[ "$1" =~ -h|help|--help ]] && { usage; exit 0; }
-
-    chkroot
-
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
     chkdirs "$BACKUPDIR" || { usage; exit 1; }
     BACKUPS=($BACKUPDIR/*)
@@ -68,11 +64,13 @@ main () {
 
     mkplate "$LOG" "$SELF" "Start"
 
-    echo "Getting directories in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
-    get_olddirs "$DAYS" 2>&1 | tee -a "$LOG"
-    delete_olddirs  2>&1 | tee -a "$LOG"
+    echo "Getting directories in $BACKUPDIR older than $DAYS days..."
+    get_olddirs "$DAYS"
+    delete_olddirs
 
     mkplate "$LOG" "$SELF" "Finish"
 }
 
-main "$@"
+[[ "$1" =~ -h|help|--help ]] && { usage; exit 0; }
+chkroot
+main "$@" 2>&1 | tee -a "$LOG"
