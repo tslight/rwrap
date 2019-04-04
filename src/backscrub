@@ -96,7 +96,7 @@ delete_olddirs () {
 main () {
     local total=0
 
-    [[ "$1" =~ "-h|help|--help" ]] && { usage; exit 0 }
+    [[ "$1" =~ -h|help|--help ]] && { usage; exit 0; }
 
     chkroot
 
