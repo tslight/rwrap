@@ -96,6 +96,8 @@ delete_olddirs () {
 main () {
     local total=0
 
+    [[ "$1" =~ "-h|help|--help" ]] && { usage; exit 0 }
+
     chkroot
 
     [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
