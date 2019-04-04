@@ -65,12 +65,15 @@ main () {
     [[ -z "$2" ]] && get_days || DAYS="$2"
     [[ $DAYS =~ ^[0-9]+$ ]] || { echo "Invalid integer."; usage; exit 1; }
 
-    mkplate "$LOG" "$SELF" "Start"
 
+    mkplate "$LOG" "$SELF" "Start"
     echo "Getting backups in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
     get_olddirs
-    delete_olddirs
-
+    if [[ "${#OLDBACKUPS[@]}" -eq 0 ]]; then
+	delete_olddirs
+    else
+	echo "No backups older than $DAYS days found in $BACKUPDIR." | tee -a "$LOG"
+    fi
     mkplate "$LOG" "$SELF" "Finish"
 }
 
