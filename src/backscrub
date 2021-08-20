@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+LIB="/usr/local/lib/bash"
+[[ -d "$LIB" ]] || { echo "$LIB doesn't exist. Aborting"; exit 1; }
+for l in "$LIB"/*; do
+    source "$l" || { echo "$l not found"; exit 1; }
+done
+SELF="$(basename "$0")"
+LOG="/var/log/$SELF-$(date +%Y.%m.%d).log"
+OLDBACKUPS=()
+
+usage () {
+    echo "
+$(basename "$0") [PATH] [NUMBER OF DAYS]
+"
+}
+
+get_bkupdir () {
+    read -rep "Enter a backup directory: " BACKUPDIR
+}
+
+get_days () {
+    read -rep "Enter a number of days: " DAYS
+}
+
+get_olddirs () {
+    for d in "${BACKUPS[@]}"; do
+	while IFS=  read -r -d $'\0' path; do
+	    OLDBACKUPS+=("$path")
+	done < <(find "$d" -maxdepth 1 -mindepth 1 -type d -mtime +"$DAYS" -print0)
+    done
+}
+
+delete_olddirs () {
+    local automate="$1"
+    local -i size total
+    local hrsize hrtotal
+
+    for d in "${OLDBACKUPS[@]}"; do
+	size=$(du -sb "$d" | awk 'NF{NF--};1') # https://unix.stackexchange.com/a/234436
+	hrsize=$(convert "$size")
+	if ask "Would you like to delete $d ($hrsize) ? "; then
+	    echo "Deleting $d ($hrsize)..." | tee -a "$LOG"
+	    total+="$size"
+	    rm -rf "$d"
+	else
+	    echo "Not deleting $d." | tee -a "$LOG"
+	fi
+    done
+
+    hrtotal=$(convert "$total")
+    echo "Successfully freed $hrtotal." | tee -a "$LOG"
+}
+
+main () {
+    local total=0
+
+    [[ "$1" =~ -h|help|--help ]] && { usage; exit 0; }
+    chkroot
+
+    [[ -z "$1" ]] && get_bkupdir || BACKUPDIR="$1"
+    chkdirs "$BACKUPDIR" || { usage; exit 1; }
+    BACKUPS=($BACKUPDIR/*)
+
+    [[ -z "$2" ]] && get_days || DAYS="$2"
+    [[ $DAYS =~ ^[0-9]+$ ]] || { echo "Invalid integer."; usage; exit 1; }
+
+    mkplate "$LOG" "$SELF" "Start"
+    echo "Getting backups in $BACKUPDIR older than $DAYS days..." | tee -a "$LOG"
+    get_olddirs
+    if [[ "${#OLDBACKUPS[@]}" -gt 0 ]]; then
+	delete_olddirs
+    else
+	echo "No backups older than $DAYS days found in $BACKUPDIR." | tee -a "$LOG"
+    fi
+    mkplate "$LOG" "$SELF" "Finish"
+}
+
+main "$@"

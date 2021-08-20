@@ -1,0 +1,798 @@
+#!/usr/bin/env bash
+
+#
+# RSYNC ARGUMENTS:
+#
+# -r		--recursive            recurse into directories
+# -a		--archive              archive mode; same as -rlptgoD (no -H)
+# -p		--perms                preserve permissions - doesn't work backing up to smb share
+# -g		--group                preserve group - doesn't work backing up to smb share
+# -o		--owner                preserve owner - doesn't work backing up to smb share
+# -l		--links                copy symlinks as symlinks - doesn't work backing up to smb share
+# -u		--update               skip files that are newer on the receiver
+# -v		--verbose              increase verbosity
+# -h		--human-readable       output numbers in a human-readable format
+# -E		--extended-attributes  copy extended attributes, resource forks - incompatible with 3.x on server...
+# -H		--hard-links           preserve hard links
+# -n		--dry-run              don't actually copy any files
+# -i		--itemize-changes      output a change summary for all changes
+# -t            --times                preserve times
+# -D            --devices, --specials  preserve device & special files
+# -z            --compress             compress file date during transfer
+# -X            --xattrs               preserve extended attributes (version > 3)
+# -E            --extended-attributes  preserve extended attributes (version < 3)
+# --stats                              give some file-transfer stats
+# --exclude=PATTERN                    exclude files matching PATTERN
+# --link-dest=DIR                      hardlink to files in DIR when unchanged
+#
+
+# https://www.davidpashley.com/articles/writing-robust-shell-scripts/#id2382181
+
+# set -o nounset  # check for unset variables
+# set -o errexit  # exit if any statement returns non-true (1) - renders $? redundant
+# set -o pipefail # don't just fail on last item in pipeline, eg) false | true will fail
+
+################################################################################
+#                          SECTION: Define Constants                           #
+################################################################################
+
+declare SHARE MOUNT TYPE FS
+declare AUTOMATE_EXCLUDES=false AUTOMATE_USERS=false VERBOSE=false
+declare -a USERS OPTS SMBOPTS DEFAULT_EXCLUDES HOME_EXCLUDES LIBRARY_EXCLUDES EXCLUDES
+declare -i VERSION
+
+readonly USERS=($(dscl . list /Users | grep -Eiv '_|admin|daemon|guest|local|nobody|root'))
+readonly VERSION=$(rsync --version | head -n 1 | awk '{print $3}' | awk -F . '{print $1}')
+
+OPTS=(
+    --archive
+    --human-readable
+)
+
+SMBOPTS=(
+    --human-readable
+    --recursive
+    --times
+)
+
+DEFAULT_EXCLUDES=(
+    --exclude="desktop.ini"
+    --exclude="AppData/"
+    --exclude="*.ost"
+    --exclude="*.pst"
+    --exclude="*spotify*"
+    --exclude="*Spotify*"
+)
+
+# pseudo hash table, to allow for more meaningful names when prompting user.
+HOME_EXCLUDES=(
+    'Dotfiles':--exclude=".*/"
+    'Applications':--exclude="Applications*/"
+    'Parallels VMs':--exclude="Documents/Parallels/"
+    'Library:'--exclude="Library/"
+    'Downloads':--exclude="Downloads/"
+    'iTunes Library':--exclude="Music/iTunes/"
+)
+
+DOT_EXCLUDES=(
+    'DS_Store Files':--exclude=".DS_Store"
+    'Emacs Config':--exclude=".emacs.d/"
+    'Git Files':--exclude="*.git*"
+    'Localization Files':--exclude=".localized"
+    'SSH Config':--exclude=".ssh/"
+    'Trash':--exclude=".Trash/"
+    'Unix Cache':--exclude=".cache/"
+    'Unix Config':--exclude=".config/"
+    'Unix Local Directory':--exclude=".local/"
+)
+
+LIBRARY_EXCLUDES=(
+    'Application Support':--exclude="Library/Application Support/"
+    'iOS Backups':--exclude="Library/Application Support/MobileSync/Backup/"
+    'Caches':--exclude="Library/Caches/"
+    'Containers':--exclude="Library/Containers/"
+    'Group Containers':--exclude="Library/Group Containers/"
+    'Apple Mail':--exclude="Library/Mail/"
+)
+
+# read in mount_smbfs url
+getsmb () {
+    local smbhost smbpath smbuser smbpass
+
+    # -r to avoid mangled backslashes, -e for readline, -s for no echo
+    echo
+    read -rep "Enter SMB Hostname or IP Address: " smbhost
+    read -rep "Enter SMB Path: " smbpath
+    read -rep "Enter SMB User Name: " smbuser
+    read -resp "Enter SMB Password (will not echo): " smbpass
+    echo
+
+    # not marking readonly yet so we can escape invalid chars...
+    readonly FS="smbfs"
+    readonly SHARE="//$smbuser:$smbpass@$smbhost/$smbpath"
+}
+
+getrsync () {
+    local rsynchost rsyncpath
+    # local rsyncport rsyncuser
+
+    echo
+    read -rep "Enter Hostname or IP Address: " rsynchost
+    # read -rep "Enter RSYNC Daemon Port: " rsyncport
+    # read -rep "Enter Username: " rsyncuser
+    read -rep "Enter Path: " rsyncpath
+    echo
+
+    readonly FS="rsync"
+    # readonly MOUNT="rsync://$rsyncuser@$rsynchost:$rsyncport/$rsyncpath"
+    readonly MOUNT="rsync://$rsynchost/$rsyncpath"
+}
+
+getnfs () {
+    local nfshost nfspath
+
+    echo
+    read -rep "Enter NFS Hostname or IP Address: " nfshost
+    read -rep "Enter NFS Path: " nfspath
+    echo
+
+    readonly FS="nfs"
+    readonly SHARE="$nfshost:$nfspath"
+}
+
+getmount () {
+    local mount
+
+    echo
+    read -rep "Enter Mount Point: " mount
+    echo
+
+    readonly MOUNT="$mount"
+}
+
+mountshare () {
+    local share="$1"
+
+    # .* is egrep AND/this search string followed by this search string.
+    if ! mount | grep -Eq "$share.*$MOUNT"; then
+	checkdir "$MOUNT"
+	# escape spaces in url encoding - http://www.degraeve.com/reference/urlencoding.php
+	if ! mount -t "$FS" "${SHARE// /%20}" "$MOUNT"; then
+	    echo "Could not mount $share at $MOUNT. Aborting."
+	    exit 1
+	fi
+    fi
+}
+
+checkmount () {
+    local share
+
+    case "$FS" in
+	nfs)
+	    share="$SHARE"
+	    mountshare "$share"
+	    ;;
+	smbfs)
+	    # cut out password of samba mount
+	    share="${SHARE%:*}@${SHARE#*@}" # equivalent to sed 's/\:.*@/@/')
+	    mountshare "$share"
+	    OPTS=("${SMBOPTS[@]}")
+	    ;;
+    esac
+}
+
+checkargs () {
+    local -a args=("$@")
+    local arg ans
+
+    # if no args lets get some..
+    if [[ "${#args[@]}" -eq 0 ]]; then
+	if  ask "Would you like to backup to a network share? "; then
+	    while :; do
+		# -n 1 to exit after first letter
+		# -r to keep backslashes in tact
+		# -e for readline bindings
+		read -n 1 -rep "(N)FS, (R)sync or (S)amba? " ans;
+		case "$ans" in
+		    [nN]*)
+			getnfs
+			getmount
+			break
+			;;
+		    [sS]*)
+			getsmb
+			getmount
+			break
+			;;
+		    [rR]*)
+			getrsync
+			break
+			;;
+		    [cC]*)
+			break
+			;;
+		    [qQ]*)
+			exit 1
+			;;
+		    *)
+			echo "($ans) is invalid. Enter (n)fs, (s)mb, (c)ancel or (q)uit."
+			;;
+		esac;
+	    done
+	else
+	    getmount
+	fi
+    fi
+
+    # process arguments passed in on the command line
+    for arg in "${args[@]}"; do
+	case "$arg" in
+	    //*:*\@*)
+		readonly SHARE="$arg"
+		readonly FS="smbfs"
+		;;
+	    rsync://*)
+		readonly MOUNT="$arg"
+		readonly FS="rsync"
+		;;
+	    *:*)
+		readonly SHARE="$arg"
+		readonly FS="nfs"
+		;;
+	    *)
+		readonly MOUNT="$arg"
+		;;
+	esac
+    done
+
+    if [[ -z "$SHARE" &&  -z "$FS" ]]; then
+	readonly FS="usb"
+	# https://slaptijack.com/system-administration/hard-links-not-working-in-rsync-backups/
+	# https://apple.stackexchange.com/questions/53215/change-ignore-ownership-on-this-volume-from-the-command-line-for-mac-os-x-volu
+	vsdbutil -a "$MOUNT" # enable ownership on volume. should probably change this to diskutil equivalent...
+    fi
+}
+
+checkopts () {
+    # Resetting OPTIND is necessary if getopts was used previously in the script.
+    # It is a good idea to make OPTIND local if you process options in a function.
+    local opts="$1" OPTIND=1 backup=false restore=false
+
+    if [[ ! -z "$opts" && "$opts" =~ ^-[A-Za-z] ]]; then
+
+	while getopts "brxuhHv" opts; do
+	    case "$opts" in
+		b)
+		    readonly TYPE="Backup"
+		    backup=true
+		    ;;
+		r)
+		    readonly TYPE="Restore"
+		    restore=true
+		    ;;
+		x)
+		    readonly AUTOMATE_EXCLUDES=true
+		    ;;
+		u)
+		    readonly AUTOMATE_USERS=true
+		    ;;
+		v)
+		    readonly VERBOSE=true
+		    ;;
+		h)
+		    usage
+		    exit 0
+		    ;;
+		\?)
+		    echo
+		    echo "Invalid option: -$OPTARG"
+		    usage
+		    exit 1
+		    ;;
+	    esac
+	done
+	shift "$((OPTIND-1))"
+
+	# sanity check options
+	if "$backup" && "$restore"; then
+	    echo
+	    echo "You can't backup and restore at the same time!"
+	    usage
+	    exit 1
+	else
+	    checkargs "$@"
+	    checkmount
+	fi
+    else
+	echo
+	echo "No backup type selected."
+	usage
+	exit 1
+    fi
+}
+
+###############################################################################
+#                                    USAGE                                    #
+###############################################################################
+
+usage () {
+    echo "
+    $(basename "$0") [-br] [uxv] [-hH] [SHARE] [MOUNTPOINT]
+
+    REQUIRED PARAMETERS
+    -------------------
+    -b	Backup user profiles from /Users to /mountpoint/Users/user/date.
+    -r	Restore user profiles from /mountpoint/Users/user/date to /Users.
+
+    OPTIONAL PARAMETERS
+    -------------------
+    -u  Process all users without prompting.
+    -x  Automatically choose sane excludes (Caches, Trash, etc).
+    -v	Verbose stream. Useful for debugging.
+    -h	Display this help and exit.
+    "
+}
+
+###############################################################################
+#                SECTION: USEFUL PORTABLE FUNCTIONS COLLECTION                #
+###############################################################################
+
+# infinite loop to get simple user input
+ask () {
+    local question="$1" ans
+
+    while :; do
+	# -n 1 to exit after first letter
+	# -r to keep backslashes in tact
+	# -e for readline bindings
+	read -n 1 -rep "$question" ans;
+	case "$ans" in
+	    y|Y)
+		return 0
+		;;
+	    n|N)
+		return 1
+		;;
+	    q|Q)
+		echo
+		exit 1
+		;;
+	    *)
+		echo
+		echo "($ans) is invalid. Enter (y)es, (n)o or (q)uit.";
+		echo
+		;;
+	esac;
+    done
+}
+
+# check for existence of a directory and if it doesn't exist create it.
+checkdir () {
+    local dir="$1"
+
+    if [[ ! -d "$dir" ]]; then
+	if ! mkdir -p "$dir"; then
+	    echo "Error creating $dir";
+	    exit 1
+	fi
+    fi
+}
+
+# check if running as root
+checkroot () {
+    if [[ "$(id -u)" -ne 0 ]]; then
+	echo;
+	echo "This script must be run as root."
+	usage
+	exit 1
+    fi
+}
+
+# convert bytes to human readable unit
+convert () {
+    local -i bytes="$1"
+    local hr unit
+
+    # use bc to do floating point arithmetic
+    # below is awk equivalent if on system without bc...
+    # hr=$(awk -v bytes="$bytes" "BEGIN {printf \"%.2f\n\", bytes/1024**3}")
+    if ((bytes > 1073741824)); then
+	hr=$(echo "scale=2; $bytes/1024^3" | bc)
+	unit="GB"
+    elif ((bytes > 1048576)); then
+	hr=$(echo "scale=2; $bytes/1024^2" | bc)
+	unit="MB"
+    else
+	hr=$(echo "scale=2; $bytes/1024" | bc)
+	unit="KB"
+    fi
+    echo "$hr $unit"
+}
+
+# works with verbose function to echo contents of an array to the screen.
+echo_array () {
+    local str="$1" && shift # shift to make array of excludes echoed in for loop
+    local -a array=("$@")
+
+    verbose "VERBOSE: $str:"
+    for e in "${array[@]}"; do
+	verbose $'\t'" $e" # add tab char for prettier output
+    done
+}
+
+# provide user feedback for long running commands.
+spinner () {
+    local spin pid="$1" str="$2"
+    spin='-\|/'
+    i=0
+    while ps -p "$pid" &> /dev/null; do
+	local -i i=$(( (i+1) %4 ))
+	printf "\\r%s: ${spin:$i:1} " "$str"
+	sleep .1
+    done
+    # 79 expansions of the space character to blank last line to standard terminal widths
+    printf "\\r"; printf " %0.s" {0..79}
+}
+
+# create verbose stream (see echo_array function for usage).
+verbose () {
+    if "$VERBOSE"; then
+	echo "$@"
+    fi
+}
+
+###############################################################################
+#                                Copy Functions                               #
+###############################################################################
+
+get_size () {
+    local absolute_path="$1" relative_path="$2" size
+    local -a sizes=()
+
+    if [[ "$relative_path" =~ \*$ ]]; then
+	sizes=()
+	size=0
+	# check for dot paths
+	if [[ "$relative_path" =~ ^\. ]]; then
+	    sizes=($(du -sm $absolute_path | awk 'NR > 2 {print $1}'))
+	elif [[ "$relative_path" =~ ^\* ]]; then
+	    parent="${absolute_path/%\/\**}"
+	    child="${absolute_path#*\*}"
+	    sizes=($(find "$parent" -name "$child" -exec du -sm {} \; | awk '{print $1}'))
+	else
+	    for d in $absolute_path; do
+		if [[ -e $d ]]; then
+		    sizes=($(du -sm $absolute_path | awk '{print $1}'))
+		fi
+	    done
+	fi
+	for s in "${sizes[@]}"; do
+	    size=$((size+s))
+	done
+	size="${size}M"
+    else
+	size=$(du -sh "$absolute_path" | awk '{print $1}')
+    fi
+
+    echo "$size"
+}
+
+get_excludes () {
+    # https://www.linuxquestions.org/questions/programming-9/passing-array-and-variable-to-function-in-bash-script-738458/
+    local src="$1" && shift
+    local -a opt_excludes=("$@")
+    local absolute_path relative_path size
+
+    # if we're backing up and automatic excludes hasn't been selected...
+    if [[ "$TYPE" == "Backup" ]] && ! "$AUTOMATE_EXCLUDES"; then
+	for x in "${opt_excludes[@]}"; do
+	    # extract key value pairs from pseudo hash table
+	    key="${x%:*}"
+	    value="${x#*:}"
+
+	    # create relative & absolute path variables based on src
+	    absolute_path="$src${value#*=}"      # append everthing after = to src path
+	    relative_path="${value#*=}"          # remove everything before =
+	    relative_path="${relative_path%*/}"  # remove trailing slash
+
+	    # check for wildcards in exclude, in order to work out total size of
+	    # wildcard match, otherwise if the absolute path exists then just
+	    # run du on that.
+	    if [[ -e "$absolute_path" || "$relative_path" =~ \* ]]; then
+
+		size=$(get_size "$absolute_path" "$relative_path")
+
+		question="Do you want to EXCLUDE $key ($size) from $TYPE? "
+
+		# no point asking if it's empty!
+		if [[ "$size" != "0M" ]]; then
+		    case "$relative_path" in
+			Library)
+			    if ask "$question"; then
+				EXCLUDES+=("$value")
+			    else
+				get_excludes "$src" "${LIBRARY_EXCLUDES[@]}"
+			    fi
+			    ;;
+			\.\*)
+			    if ask "$question"; then
+				EXCLUDES+=("--exclude="$relative_path"") # catch all dotfiles too (dwim)
+				EXCLUDES+=("$value")
+			    else
+				get_excludes "$src" "${DOT_EXCLUDES[@]}"
+			    fi
+			    ;;
+			*)
+			    if ask "$question"; then
+				EXCLUDES+=("$value")
+			    fi
+			    ;;
+		    esac
+		fi
+
+	    fi
+	done
+    else
+
+	EXCLUDES+=(--exclude=".cache/")
+	EXCLUDES+=(--exclude=".Trash/")
+	EXCLUDES+=(--exclude="Library/Caches/")
+    fi
+}
+
+# rsync wrapper since we need to call it twice in copydir function
+rsyncer () {
+    local src="$1" dest="$2" log="$3" str="$4" pid
+    local -a opts=("${OPTS[@]}")
+    local -i size="$5"
+    local -i gb=$((1024**3))
+
+    if [[ "$TYPE" == "Backup" && "$FS" != "smbfs" ]]; then
+	# create variable to hold last backup so we can do incremental
+	# timemachinesque backups using rsync's link-dest option (not applicable
+	# to restores or smbfs based backups.)
+	if [[ "$FS" == "rsync" ]]; then
+	    last=$(rsync "${dest%/*}/"\
+		       | awk '{print $5}' | sed '/\./d'\
+		       | sort -nr | awk 'NR==2')
+	else
+	    last=$(find "$(dirname "$dest")" -type d -maxdepth 1 -mindepth 1\
+		       | sort -nr | awk 'NR==2')
+	    last=$(basename "$last") # so that both can be called with ../
+	fi
+	if [[ ! -z "$last" ]]; then
+	    opts+=(--link-dest="../$last")
+	fi
+    fi
+
+    if [[ "$str" == "Analysing Size" ]]; then
+	opts+=(--dry-run)
+    fi
+
+    opts+=(--log-file="$log")
+
+    # https://www.kernelcrash.com/blog/using-rsync-to-backup-from-osx-to-linux/2009/06/20/
+    # if ((VERSION>2)); then
+    #	opts+=(--xattrs)
+    # else
+    #	opts+=(--extended-attributes)
+    # fi
+
+    verbose "VERBOSE: Started $str at $(date +%H:%M:%S)"
+    verbose "VERBOSE: SRC  = $src"
+    verbose "VERBOSE: DEST = $dest"
+
+    if [[ "$VERSION" -lt 3 || "$FS" == "smbfs" ]]; then
+	echo_array "OPTIONS" "${opts[@]}"
+	if [[ "${#EXCLUDES[@]}" -gt 0 ]]; then
+	    echo_array "EXCLUDES" "${EXCLUDES[@]}"
+	fi
+	rsync "${opts[@]}" "${EXCLUDES[@]}" "$src" "$dest" &
+	pid=$!
+	# If this script is killed, kill rsync.
+	trap 'kill $pid 2> /dev/null' EXIT
+	spinner "$pid" "$str"
+	# Disable the trap on a normal exit.
+	trap - EXIT
+    else
+	opts+=(--info=progress2)
+	opts+=(--no-inc-recursive)
+	echo_array "OPTIONS" "${opts[@]}"
+	if [[ "${#EXCLUDES[@]}" -gt 0 ]]; then
+	    echo_array "EXCLUDES" "${EXCLUDES[@]}"
+	fi
+	rsync "${opts[@]}" "${EXCLUDES[@]}" "$src" "$dest"
+    fi
+
+    verbose $'\r'"VERBOSE: Finished $str at $(date +%H:%M:%S)"
+}
+
+checksize () {
+    local log="$1"
+    local -i bytes
+
+    bytes=$(tail -n 1 "$log" | awk '/total size/{print $NF}')
+    echo "$bytes"
+}
+
+# this function takes a source path as it's first argument, a destination path
+# as it's second and a path to a logfile as it's third
+copydir () {
+    local src="$1" dest="$2" log="$3" src_bytes_hr dest_bytes_hr
+    local -i src_bytes dest_bytes bytes_skipped
+
+    unset EXCLUDES
+    EXCLUDES+=("${DEFAULT_EXCLUDES[@]}")
+    get_excludes "$src" "${HOME_EXCLUDES[@]}"
+
+    # If we are running an old version of rsync, such as the one that comes with
+    # macOS, we use the spinner functions and staging log to give the user
+    # better feedback.
+
+    # Since we now have a compiled version of rsync 3 that we copy and run, this
+    # is a slightly moot point...
+    if [[ "$VERSION" -lt 3 || "$FS" == "smbfs" ]]; then
+
+	drlog="${log//log/stage.log}" # replace .log with .stage.log
+
+	rsyncer "$src" "$dest" "$drlog" "Analysing Size"
+
+	src_bytes=$(checksize "$drlog")
+	verbose $'\r'"VERBOSE: Total bytes to transfer: $src_bytes"
+
+	src_bytes_hr=$(convert "$src_bytes")
+	echo $'\r'"$src_bytes_hr to copy."
+
+	rsyncer "$src" "$dest" "$log" "Copying Files" "$src_bytes"
+
+	dest_bytes=$(checksize "$log")
+	verbose $'\r'"VERBOSE: Total bytes transferred: $dest_bytes"
+
+	dest_bytes_hr=$(convert "$dest_bytes")
+	echo $'\r'"$dest_bytes_hr copied."
+
+	if [[ "$src_bytes" -le "$dest_bytes" ]]; then
+	    echo "$TYPE Successful."
+	else
+	    bytes_skipped=$((src_bytes - dest_bytes))
+	    echo "$bytes_skipped bytes skipped."
+	fi
+    else
+	rsyncer "$src" "$dest" "$log" "Copying Files"
+    fi
+}
+
+# Yet another wrapper. This time to account for the case where we are using a
+# remote rsync daemon as our dest.
+
+# We need to create a skeleton directory structure to catch the first run where
+# the directory structure doesn't exist on the destination. Since we can't mount
+# and create directories like we can with smb or nfs.
+
+# This also applies to rsync's --logfile param. We need to log to a local file
+# an then rsync that that skeleton structure, with the generated log file, at
+# the end.
+
+# Cumbersome, but any alternative workarounds like simultaneously mounting with
+# a different protocol would be just as bad..
+copywrap () {
+    local user="$1" src="$2" dest="$3" date="$4" group="$5" logpath log rsync_tmp
+    local -a opts=("${OPTS[@]}")
+
+    if [[ "$FS" == "rsync" ]]; then
+	opts+=(--quiet)
+	rsync_tmp="/tmp/rsync"
+	logpath="$rsync_tmp/Logs/$TYPE/$user"
+	log="$logpath/$date.log"
+	checkdir "$logpath"
+	checkdir "$rsync_tmp/Users/$user/$date"
+	chown -R "$user":"$group" "$rsync_tmp/Users/$user"
+	rsync "${opts[@]}" "$rsync_tmp/" "$MOUNT"
+    else
+	logpath="$MOUNT/Logs/$TYPE/$user"
+	log="$logpath/$date.log"
+	checkdir "$logpath"
+	checkdir "$dest"
+	checkdir "$src"
+	copydir "$src" "$dest" "$log"
+    fi
+}
+
+kickoff () {
+    local user="$1" srcparent destparent date src dest
+    local -i group=$(id -g "$user")
+
+    echo "$TYPE of $user started..."
+    if [[ "$TYPE" == "Backup" ]]; then
+
+	srcparent="/Users"
+	destparent="$MOUNT/Users"
+
+	date=$(date "+%Y-%m-%d")
+
+	src="$srcparent/$user/"
+	dest="$destparent/$user/$date"
+
+	copywrap "$user" "$src" "$dest" "$date" "$group"
+
+    elif [[ "$TYPE" == "Restore" ]]; then
+
+	srcparent="$MOUNT/Users"
+	destparent="/Users"
+
+	if [[ "$FS" == "rsync" ]]; then
+	    date=$(rsync "$srcparent/$user/" | awk '{print $5}'\
+		       | grep -E '^\d{4}-\d{2}-\d{2}$'| sort -nr | head -n 1)
+	else
+	    date=$(basename "$(find "$srcparent/$user" -type d -maxdepth 1)"\
+		       | sort -nr | head -n 1)
+	fi
+
+	src="$srcparent/$user/$date/"
+	dest="$destparent/$user"
+
+	copywrap "$user" "$src" "$dest" "$date" "$group"
+
+	if [[ "$FS" == "smbfs" ]]; then
+	    # can't preserve AD ownership over samba...
+	    # chown -R "$user":EUMCSAATCHI\\Domain\ Users "$dest"
+	    chown -R "$user":"$group" "$dest"
+	else
+	    chown "$user":"$group" "$dest"
+	fi
+    fi
+    echo "$TYPE of $user finished."
+}
+
+###############################################################################
+#                            SECTION: Main Function                           #
+###############################################################################
+
+main () {
+    local user
+
+    # check to see if our array of users is empty, i.e, there are not users to
+    # either backup from or restore to...
+    if [[ "${#USERS[@]}" -eq 0 ]]; then
+	echo "No users to $TYPE. Exiting."
+	exit 1
+    else
+	pmset sleep 0 # prevent sleep
+	echo
+	verbose "VERBOSE: VERSION = $(which rsync) $(rsync --version | head -n 1 | awk '{print $3}')"
+	echo -n "Users: "
+	for user in "${USERS[@]}"; do
+	    if [[ "$user" == "${USERS[${#USERS[@]}-1]}" ]]; then
+		echo -n "$user"
+	    else
+		echo -n "$user, "
+	    fi
+	done
+	echo
+
+	for user in "${USERS[@]}"; do
+	    echo
+	    if "$AUTOMATE_USERS"; then
+		kickoff "$user"
+	    else
+		if ask "$TYPE ${user}? "; then
+		    kickoff "$user"
+		else
+		    echo "Skipping ${user}."
+		fi
+	    fi
+	    if [[ "$user" == "${USERS[${#USERS[@]}-1]}" ]]; then
+		echo # only need an extra echo on last element of array
+	    fi
+	done
+    fi
+}
+
+###############################################################################
+#                                SECTION: Run!                                #
+###############################################################################
+
+clear
+checkroot
+checkopts "$@"
+main

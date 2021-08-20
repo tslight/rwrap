@@ -1,0 +1,96 @@
+.TH man 1 "26 June 2018" "1.0" "rwrap man page"
+
+.SH NAME
+
+rwrap \- backup or restore all user profiles on a host
+
+.SH SYNOPSIS
+
+rwrap [-br] [uxv] [-hH] [SHARE] [MOUNTPOINT]
+
+.SH REQUIRED PARAMETERS
+
+.IP -b
+Backup user profiles from /Users to /mountpoint/Users/user/date.
+.IP -r
+Restore user profiles from /mountpoint/Users/user/date to /Users.
+
+.SH OPTIONAL PARAMETERS
+
+.IP -u
+Process all users without prompting.
+.IP -x
+Automatically choose sane excludes (Caches, Trash, etc).
+.IP -v
+Verbose stream. Useful for debugging.
+.IP -h
+Display this help and exit.
+
+.SH ARGUMENTS
+
+Takes a share url as an argument, in either standard mount_smbfs form:
+//username:password@host/path/to/PARENT/of/Users, or standard mount_nfs form:
+host:path/to/PARENT/of/Users, or standard rsync URL form:
+//rsync:host:port/path/to/PARENT/of/Users
+
+Takes a mountpoint as an argument: /Volumes/Backups. If a share has been entered
+it will be mounted here, otherwise we backup to this location. If no share or
+mountpoint is entered you will be prompted to enter them. If your share is a
+valid rsync url, there is no need to enter a mountpoint.
+
+.SH PITFALLS & CAVEATS
+
+THE PATH ON THE REMOTE HOST MUST POINT TO PARENT OF Users, NOT Users!
+
+Once mounted the mountpoint should contain the Users directory underneath it.
+The script backups to or restores from the following directory layout underneath
+the mountpoint: Users/user.name/date, and logs to:
+Logs/CopyType/user.name/date.log, where CopyType equals either Backup or
+Restore. If this layout does not exist it will be created under the mountpoint.
+
+Unless backing up to a samba share, user, group and permissions will be retained
+and each backup will be hard-linked against the last to save space and mimic the
+functionality of Time Machine.
+
+https://blog.interlinked.org/tutorials/rsync_time_machine.html
+
+When using Samba, in combination with Active Directory, ownership & permissions
+attributes are mangled, so these are not preserved in this use case, making
+incremental backups with hard links impossible. This is also the reason it’s
+necessary to recursively chown the users directory when restoring from a Samba
+share. If possible use this script in conjunction with either an NFS or rsync
+server, or a USB drive.
+
+It's also worth pointing out that for the time being preserving extended
+attributes is not supported.
+
+.SH EXAMPLES
+
+To backup from /Users to a Samba share mounted at /Volumes/Backups/Users:
+
+backup -b //user:password@hostname/Backups/macOS /Volumes/Backups
+
+To restore from a Samba share mounted at /Volumes/Backups/Users to /Users,
+choosing sane defaults:
+
+backup -rx //user:password@hostname/Backups/macOS /Volumes/Backups
+
+To backup from /Users to a rsync server, without prompting for each user:
+
+backup -bu rsync://user@host:port/backups
+
+To restore from /Users to a rsync server, with increased verbosity:
+
+restore -rv rsync://user@host:port/backups
+
+.SH SEE ALSO
+
+rsync(1), rsnapshot(1)
+
+.SH BUGS
+
+Here be dragons!
+
+.SH AUTHOR
+
+Toby Slight (tobyslight@gmail.com)

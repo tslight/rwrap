@@ -1,0 +1,40 @@
+#!/bin/sh
+SRCPARENT="/Volumes/Backups"
+DESTPARENT="/Volumes/Backups/Users"
+SNARRAY=(`ls $SRCPARENT | egrep -iv 'sn|users|scripts|^\.'`);
+
+for sn in "${SNARRAY[@]}"; do
+    if [ ${#SNARRAY[@]} -eq 0 ]; then
+	echo;
+	echo "No serial number directories.";
+	echo;
+    else
+	DATEARRAY=(`ls $SRCPARENT/$sn | egrep -iv '^\.'`);
+	if [ ${#DATEARRAY[@]} -eq 0 ]; then
+	    echo;
+	    echo "No date directories.";
+	    echo;
+	else
+	    for date in "${DATEARRAY[@]}"; do
+		USERARRAY=(`ls $SRCPARENT/$sn/$date | egrep -iv '^\.'`);
+		if [ ${#USERARRAY[@]} -eq 0 ]; then
+		    echo;
+		    echo "No user directories found. Cleaning up instead.";
+		    echo "Moving $SRCPARENT/$sn to $SRCPARENT/sn";
+		    echo;
+		    #mv -v $SRCPARENT/$sn $SRCPARENT/sn;
+		    echo;
+		else
+		    for user in "${USERARRAY[@]}"; do
+			echo;
+			echo "Making $DESTPARENT/$user";
+			#mkdir -pv $DESTPARENT/$user;
+			echo "Moving $SRCPARENT/$sn/$date/$user to $DESTPARENT/$user/$date";
+			#mv -v $SRCPARENT/$sn/$date/$user $DESTPARENT/$user/$date;
+			echo;
+		    done
+		fi
+	    done
+	fi
+    fi
+done
